@@ -126,6 +126,8 @@ const DEFAULT_FIXTURE_DATA = {
  * @classdesc Definition of a DMX512 Fixture model
  */
 class Fixture extends Proxify {
+  static modelFactory = null;
+
   /**
    * @param {Object} data Fixture initialisation data
    * @param {Object} data.OFLData OFL Object fixture configuration
@@ -144,6 +146,7 @@ class Fixture extends Proxify {
     super();
     if (!data.isStub) {
       this.OFLData = data.OFLData;
+      this.training = data.training;
       this.id = parseInt(data.id, 10);
       this.universe = parseInt(data.universe, 10);
       this.manufacturer = data.manufacturer;
@@ -177,6 +180,7 @@ class Fixture extends Proxify {
         z: 0,
       };
       this.parseFromOFLData();
+      this.name = data.name || this.OFLData.name;
       this.channels.forEach((channel) => {
         this.setChannel(channel.id - 1, 0);
       });
@@ -221,7 +225,9 @@ class Fixture extends Proxify {
       name: this.name,
       universe: this.universe,
       chStart: this.chStart,
-      mode: this.modeNam,
+      mode: this.modeName,
+        training: this.training,
+        OFLData: this.OFLData,
       position: this.position,
       rotation: this.rotation,
     };
@@ -709,6 +715,10 @@ class Fixture extends Proxify {
    * @todo implement every fixture type
    */
   prepare3DModelInstance() {
+    if (Fixture.modelFactory) {
+      this._3DModel = Fixture.modelFactory(this);
+      return;
+    }
     switch (this.category) { // Checking fixture category
       case FIXTURE_TYPES.MOVING_HEAD: { // Fixture is a moving head
         const movingHead = new MovingHead({ // Creating new moving head instance
@@ -813,6 +823,7 @@ class Fixture extends Proxify {
    * @param {Boolean} state wheter the fixture Model should be highlighted or not
    */
   highlight(state, centerControls = false) {
+    if (this._3DModel?.isTrainingModel) { this._3DModel.highlighted = state; return; }
     if (this._3DModel) {
       this._3DModel.highlighted = state;
       if (centerControls) {
@@ -831,6 +842,7 @@ class Fixture extends Proxify {
    * @param {Boolean} state wheter the fixture Model should be highlighted or not
    */
   highlightSingle(state, centerControls = false) {
+    if (this._3DModel?.isTrainingModel) { this._3DModel.highlighted = state; return; }
     if (this._3DModel) {
       this._3DModel.setSinglyHighlighted(state);
       if (state && centerControls) {
@@ -851,6 +863,7 @@ class Fixture extends Proxify {
    * @static
    */
   static deleteInstance(instance) {
+    if (instance._3DModel?.isTrainingModel) { instance._3DModel.dispose(); return; }
     switch (instance.category) {
       case FIXTURE_TYPES.MOVING_HEAD:
         MovingHead.deleteInstance(instance._3DModel);

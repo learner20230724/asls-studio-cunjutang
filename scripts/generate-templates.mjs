@@ -1,0 +1,10 @@
+import {mkdir,writeFile,copyFile} from 'node:fs/promises';
+import {createTemplate,profile,TYPES} from '../src/training/rig.mjs';
+const dir=new URL('../public/teaching/',import.meta.url);await mkdir(dir,{recursive:true});
+await writeFile(new URL('cunjutang.showfile.json',dir),JSON.stringify(createTemplate(),null,2));
+await copyFile(new URL('../COPYING',import.meta.url),new URL('COPYING',dir));
+await copyFile(new URL('../CREDITS.html',import.meta.url),new URL('CREDITS.html',dir));
+await writeFile(new URL('SOURCE.txt',dir),'ASLS Studio Cunjutang teaching edition / 存菊堂灯光排练室\nGPL-3.0. Original author: Timé Kadel / ASLS.\nCorresponding source and modifications:\nhttps://github.com/learner20230724/asls-studio-cunjutang/tree/codex/cunjutang-zh-training\nUpstream baseline: bd6d842fd7eb2dc27e65bcadcf3fb66b64bf2fe9\nTraining estimate, not a venue survey. No hardware output.\nUpload the entire dist directory to a static HTTP server; do not open index.html through file://.\n');
+const fixtureDir=new URL('../public/fixtures/cunjutang/',import.meta.url);await mkdir(fixtureDir,{recursive:true});
+for(const kind of TYPES)await writeFile(new URL(`${kind}.json`,fixtureDir),JSON.stringify(profile(kind),null,2));
+console.log('Generated Cunjutang template: 215 fixtures / 4 faults / 4 native scenes.');

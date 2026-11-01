@@ -63,7 +63,7 @@ class GroupPool {
    */
   addRaw(groupData) {
     const group = new Group(groupData);
-    if (!group.id) {
+    if (group.id == null) {
       group.id = this.genGroupId();
     }
     this.groups.push(group);
@@ -107,14 +107,7 @@ class GroupPool {
    * @returns {Number} The group's unique ID
    */
   genGroupId() {
-    return this.groups.reduce(
-      (prev, current) => (
-        (prev && prev.id > current.id)
-          ? prev.id
-          : current.id
-      ),
-      -1,
-    ) + 1;
+    return Math.max(-1, ...this.groups.map(item => item.id)) + 1;
   }
 }
 

@@ -1,0 +1,42 @@
+async (page) => {
+  const results=[];
+  const check=async(name,condition)=>{if(!await condition())throw new Error(name);results.push({name,pass:true});};
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('button',{name:'布局',exact:true}).click();
+  await page.getByRole('button',{name:'面光 L01 正常',exact:true}).click();
+  await page.getByRole('slider',{name:'亮度',exact:true}).focus();
+  await page.keyboard.press('End');
+  await check('mobile fixture control',()=>page.evaluate(()=>window.__CJT.engine.fixtures[0].channels[0].value.DMX===255));
+  await page.screenshot({path:'output/playwright/mobile-controls.png'});
+  await page.getByRole('button',{name:'演员与道具',exact:true}).click();
+  await page.getByRole('button',{name:'＋ 添加演员',exact:true}).click();
+  await page.getByLabel('横向位置').fill('3');await page.getByLabel('横向位置').press('Tab');
+  await check('actor placement UI',()=>page.evaluate(()=>window.__CJT.engine.training.objects.at(-1).x===3));
+  await page.getByRole('button',{name:'场景',exact:true}).click();
+  page.once('dialog',dialog=>dialog.accept('UI rehearsal cue'));
+  await page.getByRole('button',{name:'＋ 保存当前灯光',exact:true}).click();
+  await check('capture scene UI',()=>page.getByRole('textbox',{name:'名称 5',exact:true}).inputValue().then(v=>v==='UI rehearsal cue'));
+  await page.getByRole('spinbutton',{name:'渐变 5',exact:true}).fill('0.5');await page.getByRole('spinbutton',{name:'渐变 5',exact:true}).press('Tab');
+  await page.getByRole('button',{name:'调用 ↗',exact:true}).last().click();
+  await page.screenshot({path:'output/playwright/mobile-cues.png'});
+  await check('no mobile horizontal overflow',()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.getByRole('button',{name:'Switch language',exact:true}).click();
+  await check('English UI',()=>page.getByRole('button',{name:'＋ Capture current look',exact:true}).isVisible());
+  await page.getByRole('button',{name:'Switch language',exact:true}).click();
+  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'↧ 导出工程',exact:true}).click();const download=await downloadPromise;await download.saveAs('output/playwright/ui-roundtrip.showfile.json');
+  await check('export download',async()=>download.suggestedFilename().endsWith('.json'));
+  await page.evaluate(()=>window.__CJT.engine.save(true));
+  await page.reload();await page.waitForFunction(()=>window.__CJT?.ready);
+  await check('reload retains scene and actor',()=>page.evaluate(()=>window.__CJT.engine.cues.at(-1).cue.name==='UI rehearsal cue'&&window.__CJT.engine.training.objects.at(-1).x===3));
+  // Import through the actual file input without depending on native OS file dialogs.
+  await page.locator('input[type=file]').setInputFiles('output/playwright/ui-roundtrip.showfile.json');
+  await page.waitForFunction(()=>document.querySelector('.toast')?.textContent.includes('工程已导入'));
+  await check('file import UI',()=>page.evaluate(()=>window.__CJT.engine.cues.length===5));
+  await page.evaluate(async()=>{const a=window.__CJT;const d=await(await fetch('./teaching/cunjutang.showfile.json')).json();await a.engine.load(d);a.engine.go(0,true);a.sync();a.engine.save(true);});
+  await page.getByRole('button',{name:'舞台',exact:true}).click();
+  await page.screenshot({path:'output/playwright/mobile-stage.png'});
+  await page.setViewportSize({width:1536,height:960});
+  await page.screenshot({path:'output/playwright/desktop-final.png'});
+  await page.evaluate(r=>{window.__CJT.uiTestResults=r;},results);
+  return results;
+}

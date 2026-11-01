@@ -1,188 +1,94 @@
-<div align="center">
+# 存菊堂 · 灯光排练室
 
-<img src="https://raw.githubusercontent.com/ASLS-org/studio/develop/src/assets/images/studio_logo_textual.svg" alt="ASLS Studio" width="320"/>
+ASLS Studio 的中文教学 fork：认识灯位、试灯、摆放演员和道具、编排灯光场景。
 
-**Open-source, web-based DMX lighting control software and visualizer**
+**215 盏灯 / 4 盏故障 / 16 盏摇头灯 / 免登录 / 不连接现场硬件。**
 
-[![License: GPL v3](https://img.shields.io/github/license/asls-org/studio)](https://github.com/ASLS-org/studio/?tab=GPL-3.0-1-ov-file)
-[![Version](https://img.shields.io/github/v/tag/asls-org/studio?include_prereleases&sort=semver&style=flat&label=version)](https://github.com/ASLS-org/studio/releases)
-[![Made with Vue.js](https://madewithvuejs.com/storage/repo-shields/4381-shield.svg)](https://madewithvuejs.com/p/asls-studio/shield-link)
+上游：[ASLS-org/studio](https://github.com/ASLS-org/studio)，基线 `bd6d842fd7eb2dc27e65bcadcf3fb66b64bf2fe9`。保留原生 Fixture、Channel、Group、Scene、Effect、Chase 和 showfile，新增中文教学工作台和分批受光渲染器。上游原文见 [README.upstream.md](README.upstream.md)。
 
-[Live Demo](https://demo.studio.asls.timekadel.com) · [Issues](https://github.com/ASLS-org/studio/issues) · [Discussions](https://github.com/ASLS-org/studio/discussions)
+## 本地启动
 
-</div>
+需要 Node.js 22 或更新版本，建议使用开启硬件加速的 Chrome / Edge（WebGL 2）。
 
----
+**Windows：双击 `Start-Local.cmd`**。首次安装依赖并构建，随后访问 `http://127.0.0.1:4179/`。启动窗口需要保持运行。
 
-> **Beta Notice:** ASLS Studio is in active beta development. All features are provided as-is. Please report any bugs or unexpected behaviour on the [issue tracker](https://github.com/ASLS-org/studio/issues).
-
----
-- [What is ASLS Studio?](#what-is-asls-studio)
-- [Features](#features)
-  - [Lighting](#lighting)
-    - [Universe \& Fixture Patching](#universe--fixture-patching)
-    - [Fixture Grouping](#fixture-grouping)
-    - [Scene Composition](#scene-composition)
-    - [Parametric Effect Engine](#parametric-effect-engine)
-    - [Chase Sequencer](#chase-sequencer)
-  - [Common](#common)
-    - [Real-Time 3D Visualizer](#real-time-3d-visualizer)
-    - [Desktop App](#desktop-app)
-- [Requirements](#requirements)
-- [Getting Started](#getting-started)
-  - [1. Clone the repository](#1-clone-the-repository)
-  - [2. Install dependencies](#2-install-dependencies)
-  - [3. Start the development server](#3-start-the-development-server)
-  - [Production build (web)](#production-build-web)
-  - [Desktop distribution](#desktop-distribution)
-- [Streaming to Hardware](#streaming-to-hardware)
-- [Tech Stack](#tech-stack)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgements](#acknowledgements)
-
-___
-
-## What is ASLS Studio?
-
-ASLS Studio is a self-contained show control environment and DMX lighting control platform that covers the full workflow: patching fixtures into universes, grouping them, composing scenes and effects, sequencing cues into chases, and visualising everything in real time inside a 3D WebGL viewport. Studio can run entirely in the browser as a static web app, or be packaged as a native desktop application for Linux, macOS, and Windows via Electron.
-
-Live show data can be streamed out to physical hardware via the **WSC (Web Show Control)** protocol — a compact binary protocol with a gateway that translates to industry-standard downstream protocols.
-
----
-
-## Features
-
-### Lighting
-
-#### Universe & Fixture Patching
-Create and manage DMX universes, patch fixtures from a built-in library (XML fixture definitions parsed via `xml2js`), assign DMX addresses and operating modes, and adjust per-fixture settings at any time through the Universe Modifier. Channel faders allow live manipulation of any patched fixture's output including color, pan/tilt, zoom, intensity, strobe, and more.
-
-#### Fixture Grouping
-Fixtures from different universes can be combined into logical groups. Groups are the unit of cue programming: scenes and effects are defined at the group level and can span the show's entire rig.
-
-#### Scene Composition
-Scenes are snapshot-style cues that drive a set of fixtures to predefined channel values. Each scene supports configurable fade in/out curves based on Bézier easing (linear, ease, ease-in, ease-in-out, or fully custom), relative or absolute start points, loop and trigger modes, and precise multi-fixture editing — including a unified channel view when multiple fixtures are selected simultaneously.
-
-#### Parametric Effect Engine
-Effects modulate fixture channels over time using waveforms (sine, triangle, square). Per-channel and per-fixture parameters include frequency, min/max boundaries, phase shift, and directional spread across the fixture group — enabling smooth fan-like animations with minimal setup.
-
-#### Chase Sequencer
-Chases are timeline-based compositions of group cues (scenes and effects) arranged across a bar grid. They support independent quantization, BPM-synced durations, loop and single-shot modes, and parallel cue lanes per group. The timeline editor supports drag-to-resize cue blocks, vertical zoom, and fold-to-hide empty lanes.
-
-### Common
-
-#### Real-Time 3D Visualizer
-A WebGL 2.0 viewport powered by [Three.js](https://threejs.org/) r170 and the `postprocessing` library renders the full rig in three dimensions. Fixtures respond to live channel data — position, color, beam angle, zoom, strobe, and color wheel slots are all emulated in real time. The visualizer includes volumetric beam rendering, simulated atmospheric fog with turbulence, physically-accurate or simplified light attenuation, in-viewport fixture transform controls (translate, rotate, discrete), and adjustable global scene illumination.
-
-#### Desktop App
-In addition to running as a static web app, Studio can be packaged as a native desktop application via Electron. Distribution targets are configured for Linux (arm64), macOS (arm64), and Windows (x64).
-
----
-
-## Requirements
-
-| | Minimum | Recommended |
-|---|---|---|
-| **RAM** | 4 GB | 8 GB or more |
-| **GPU** | WebGL 1.0 support | Dedicated GPU with WebGL 2.0 |
-| **Node.js** | v16.15.1 | Latest LTS |
-| **Browser** | Chrome, Firefox, Opera (latest) | Chrome |
-| **OS** | Any OS with Node.js support | — |
-
----
-
-## Getting Started
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/ASLS-org/studio
-cd studio
-```
-
-### 2. Install dependencies
-
-```bash
-npm install
-```
-
-### 3. Start the development server
-
-```bash
-npm start
-```
-
-Then open [http://localhost:5173](http://localhost:5173) in your browser.
-
-### Production build (web)
-
-```bash
+```sh
+npm ci
+npm run templates
 npm run build
+npm run serve
 ```
 
-Built files are placed in `./dist` and can be served by any static file host.
+开发：`npm start -- --host 127.0.0.1 --port 5179`。修改代码后手动刷新；为避免上游单例引擎重复初始化，已禁用 HMR。
 
-### Desktop distribution
+`.npmrc` 禁用依赖生命周期脚本；不需要 Electron 二进制。教学版移除了 WSC 硬件依赖，原上游的 Electron／硬件打包流程不在本版本支持范围内。
 
-```bash
-# Linux (arm64)
-npm run dist:linux
+## 如何排练
 
-# macOS (arm64)
-npm run dist:mac
+1. 左侧分区选中整组；点击格子或舞台灯具选中单灯，Shift / Ctrl 多选。
+2. 调亮度；彩灯可调颜色，摇头灯可调水平／垂直方向。固定灯默认只调亮度。
+3. 在“演员与道具”添加、命名、移动、旋转演员、桌、椅、方台。
+4. “保存当前灯光”生成原生 ASLS Scene。可改名称、渐变秒数、排序、覆盖、删除。
+5. “调用”切换单场；“播放”按顺序渐变，完成后停留 2 秒再到下一场；“停止”保持当前灯光。
+6. 总黑场屏蔽全部模拟输出；“假设全部修好”只影响预览，不修改故障记录。
+7. 定期导出 JSON 工程，供备份、换电脑或交作业。
 
-# Windows (x64)
-npm run dist:win
+手机使用底部“布局／舞台／控制／场景”导航。真实手机 GPU 性能需另行确认，桌面移动视口不等于真机测试。
+
+## 保存、模板、兼容
+
+- 首次打开载入存菊堂模板，以后恢复当前浏览器保存；修改后约 2 秒自动保存。
+- 不同浏览器独立保存，无自动跨设备同步。清理网站数据会删除练习，请导出备份。
+- 已保存数据损坏时保留原记录并提示；自动载入默认模板，主动保存才覆盖损坏记录。
+- “模板编辑”修改舞台尺寸、五排深度、灯位、编号、类型、角度、照射目标、故障；可复制／删除灯具。
+- 批量编辑只应用真正修改的参数，不因改变光束角而清除组内故障或统一照射目标。
+- “另存为模板”仍为 showfile。原模板位于 `public/teaching/cunjutang.showfile.json`，由 `npm run templates` 生成。
+- 原生 ASLS JSON 可导入，原分组、场景、效果和 Chase 保留；导入效果／序列可运行，但本界面不提供完整的原生效果时间轴编辑器。
+- 不支持 QLC XML，不保证任意厂商灯具的特殊光学效果。缺少灯具定义时提示并保留当前工程。
+- 新增 `training.version: 1` 扩展，保存舞台、站位、设置、当前通道值和渐变时间；灯具保存稳定编号、区域、故障等元信息和 OFL 定义。旧文件补充默认值。
+- 导入的 `outputs` / `selectedOutputs` 被清空，输出池拒绝新建硬件连接。
+
+## 灯位与估算边界
+
+站在台上面朝观众定义左右：+X 台左、+Y 后舞台、+Z 向上。灯号不随摄像机旋转改变。耳光从上往下，五排顶光从台口往后。
+
+| 区域 | 数量 | 故障 |
+|---|---:|---|
+| 面光 | 27 | 左数第 4 盏 |
+| 左耳光 | 12 | 无；数量按右侧镜像估算 |
+| 右耳光 | 12 | 最上排中间 |
+| 左右侧光 | 24 | 无；每侧 3 组 2×2 |
+| 顶光 1 / 3 / 5 排 | 每排 30 | 第一排顶灯左数第 2 盏、会议灯右数第 4 盏；三、五排无故障 |
+| 顶光 2 / 4 排 | 每排 19 | 每排 11 会议灯 + 8 摇头灯，无故障 |
+| 独立末排彩灯 | 12 | 无 |
+
+奇数排每排 15 顶灯 + 15 会议灯，从台左起交替、分别编号。左侧柱光后方两组更近，右侧均匀。
+
+初始宽 16m、深 15m、灯高 8m，五排深度 1.5 / 4.25 / 7 / 9.75 / 12.5m。**这是教学估算，不是存菊堂实测。** 面光、耳光、侧光和顶灯默认固定暖白光，会议灯中性白光，末排和摇头灯采用通用 RGB 能力。
+
+照片参考：[苏州大学音乐学院报道](https://music.suda.edu.cn/36/ae/c14079a603822/page.htm)。未取得可靠尺寸图，未将网络照片作为项目素材。
+
+## 渲染与限制
+
+- 模型／光束按 2 的幂扩容，无 100 盏截断。地面及演员受光以 32 灯一批累加到 HDR 目标，统一色调映射。
+- 故障、黑场、总控与 Solo 在最终输出处统一处理，场景播放无法绕过。
+- 低画质使用 1× 像素比、关闭空气光束，不通过删灯提速。默认不计算复杂阴影。
+- 不提供校准照度、准确布景遮挡、肤色预测、真实烟雾或完整 Gobo 光学。场地为方便观察的剖视结构。
+- 演员仅静态站位，不随灯光场景移动；无自动走位、音频同步、多人协作和自动评分。
+
+## 测试与部署
+
+```sh
+npm test
+npm run build
+node scripts/serve.mjs --port 4179
+node scripts/serve.mjs --port 4180 --base /rehearsal
 ```
 
----
+浏览器脚本：`scripts/browser-check.js`。详见 [验证记录](docs/verification-zh.md) 和 [部署说明](docs/deployment-zh.md)。上传整个 `dist/` 即可，无后端或数据库。
 
-## Streaming to Hardware
+改动概要见 [教学版改动说明](docs/changes-zh.md)。
 
-Studio sends live show data using the **[WSC (Web Show Control)](https://github.com/ASLS-org/WSC)** protocol — a compact, binary, transport-agnostic protocol designed for real-time control of performance and show systems.
+## 许可
 
-WSC carries multiple message types over a single connection: bulk channel data (DMX universes), linear timecode (SMPTE/MTC), cue lifecycle commands (GO, STOP, PAUSE…), typed parameter writes, and opaque binary tunnels to downstream systems. Every packet includes a Transport Descriptor that tells the gateway which downstream protocol to use — so the browser never needs to know about the physical layer.
-
-The reference gateway (`@asls/wsc-server`) runs as a Node.js process alongside Studio and translates incoming WSC packets to the appropriate downstream protocol. Forwarding targets include Art-Net, sACN, DMX512, MIDI, MIDI Show Control, MIDI Timecode, OSC, and others.
-
-Refer to the [WSC repository](https://github.com/ASLS-org/WSC) and its JavaScript implementation guide for gateway setup instructions.
-
----
-
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| UI Framework | [Vue 3](https://vuejs.org/) |
-| 3D Visualizer | [Three.js](https://threejs.org/) r170 + WebGL 2.0 + GLSL + [postprocessing](https://github.com/pmndrs/postprocessing) |
-| Build Tool | [Vite](https://vitejs.dev/) |
-| Desktop Shell | [Electron](https://www.electronjs.org/) v41 via `electron-vite` + `electron-builder` |
-| Show Output | [WSC](https://github.com/ASLS-org/WSC) via `@asls/wsc-client` / `@asls/wsc-sdk` |
-| Fixture Definitions | XML parsing via `xml2js` |
-| Event Bus | `mitt` |
-
----
-
-## Contributing
-
-Contributions of all kinds are welcome — bug reports, feature requests, fixture library additions, documentation improvements, and code.
-
-1. **Fork** the repository and create a branch off `develop`.
-2. Make your changes and test them locally (`npm start`).
-3. Open a **Pull Request** against `develop` with a clear description of the change and why.
-
-For larger changes or new features, opening a [Discussion](https://github.com/ASLS-org/studio/discussions) first is encouraged to align on direction before writing code.
-
----
-
-## License
-
-ASLS Studio is released under the **GNU General Public License v3.0**. See the [`COPYING`](./COPYING) file for full terms.
-
----
-
-## Acknowledgements
-
-ASLS Studio grew out of the ASLS research project and was made freely available to the lighting and open-source communities. Third-party library credits are listed in [`CREDITS.html`](./CREDITS.html).
+保留原作者 Timé Kadel / ASLS 署名、`COPYING`（GPL-3.0）及 `CREDITS.html`，本 fork 以同一许可证提供修改源码。灯具资料保留原有元数据和归属。场地记录来自用户，不代表苏州大学官方测绘或认证。

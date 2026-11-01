@@ -1,0 +1,32 @@
+{
+  "name": "Teaching conference",
+  "categories": [
+    "Other"
+  ],
+  "physical": {
+    "bulb": {
+      "colorTemperature": 4500
+    },
+    "lens": {
+      "degreesMinMax": [
+        36,
+        36
+      ]
+    }
+  },
+  "modes": [
+    {
+      "name": "Teaching",
+      "channels": [
+        "Dimmer"
+      ]
+    }
+  ],
+  "availableChannels": {
+    "Dimmer": {
+      "capability": {
+        "type": "Intensity"
+      }
+    }
+  }
+}

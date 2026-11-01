@@ -1,0 +1,7 @@
+ASLS Studio Cunjutang teaching edition / 存菊堂灯光排练室
+GPL-3.0. Original author: Timé Kadel / ASLS.
+Corresponding source and modifications:
+https://github.com/learner20230724/asls-studio-cunjutang/tree/codex/cunjutang-zh-training
+Upstream baseline: bd6d842fd7eb2dc27e65bcadcf3fb66b64bf2fe9
+Training estimate, not a venue survey. No hardware output.
+Upload the entire dist directory to a static HTTP server; do not open index.html through file://.

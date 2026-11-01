@@ -119,14 +119,7 @@ class CuePool extends Proxify {
    * @returns {Number} The cue's unique ID
    */
   genCueId() {
-    return this.chases.reduce(
-      (prev, current) => (
-        (prev && prev.id > current.id)
-          ? prev.id
-          : current.id
-      ),
-      -1,
-    ) + 1;
+    return Math.max(-1, ...this.cues.map(item => item.id)) + 1;
   }
 
   /**

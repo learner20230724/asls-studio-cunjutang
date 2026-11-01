@@ -1,0 +1,69 @@
+{
+  "name": "Teaching moving",
+  "categories": [
+    "Moving Head"
+  ],
+  "physical": {
+    "bulb": {
+      "colorTemperature": 3200
+    },
+    "lens": {
+      "degreesMinMax": [
+        36,
+        36
+      ]
+    }
+  },
+  "modes": [
+    {
+      "name": "Teaching",
+      "channels": [
+        "Dimmer",
+        "Red",
+        "Green",
+        "Blue",
+        "Pan",
+        "Tilt"
+      ]
+    }
+  ],
+  "availableChannels": {
+    "Dimmer": {
+      "capability": {
+        "type": "Intensity"
+      }
+    },
+    "Red": {
+      "capability": {
+        "type": "ColorIntensity",
+        "color": "Red"
+      }
+    },
+    "Green": {
+      "capability": {
+        "type": "ColorIntensity",
+        "color": "Green"
+      }
+    },
+    "Blue": {
+      "capability": {
+        "type": "ColorIntensity",
+        "color": "Blue"
+      }
+    },
+    "Pan": {
+      "capability": {
+        "type": "Pan",
+        "angleStart": "-180deg",
+        "angleEnd": "180deg"
+      }
+    },
+    "Tilt": {
+      "capability": {
+        "type": "Tilt",
+        "angleStart": "-90deg",
+        "angleEnd": "90deg"
+      }
+    }
+  }
+}

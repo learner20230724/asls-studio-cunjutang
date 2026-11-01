@@ -1,0 +1,53 @@
+{
+  "name": "Teaching rgb",
+  "categories": [
+    "Color Changer"
+  ],
+  "physical": {
+    "bulb": {
+      "colorTemperature": 3200
+    },
+    "lens": {
+      "degreesMinMax": [
+        36,
+        36
+      ]
+    }
+  },
+  "modes": [
+    {
+      "name": "Teaching",
+      "channels": [
+        "Dimmer",
+        "Red",
+        "Green",
+        "Blue"
+      ]
+    }
+  ],
+  "availableChannels": {
+    "Dimmer": {
+      "capability": {
+        "type": "Intensity"
+      }
+    },
+    "Red": {
+      "capability": {
+        "type": "ColorIntensity",
+        "color": "Red"
+      }
+    },
+    "Green": {
+      "capability": {
+        "type": "ColorIntensity",
+        "color": "Green"
+      }
+    },
+    "Blue": {
+      "capability": {
+        "type": "ColorIntensity",
+        "color": "Blue"
+      }
+    }
+  }
+}

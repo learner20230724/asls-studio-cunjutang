@@ -2,9 +2,7 @@ import axios from 'axios';
 import {
   EventEmitter,
 } from 'events';
-import {
-  parseStringPromise as XMLParse,
-} from 'xml2js';
+const XMLParse = async () => { throw new Error('此教学版本请导入 ASLS JSON 工程 / Import an ASLS JSON showfile'); };
 import {
   ProxifySingleton,
 } from '../utils/proxify.utils';
@@ -16,7 +14,7 @@ import FixturePool from './fixture.pool.model';
 import Live from './live.model';
 import OutputPool from './output.pool.model';
 
-const LOCALSTORAGE_SHOWFILE_KEY = 'ASLS_STUDIO_SHOWFILE';
+const LOCALSTORAGE_SHOWFILE_KEY = 'CUNJUTANG_SHOW_V1';
 const DEFAULT_PROJECT_NAME = 'new_project.asls';
 const DEFAULT_BPM_VALUE = 120;
 
@@ -65,7 +63,7 @@ class Show extends EventEmitter {
       this.emit('saveState', this.isSaved);
     });
     this.universePool.addRaw();
-    this.preloadFixtureList();
+    // Fixture library loaded on demand by the workbench.
   }
 
   set saveState(saveState) {
@@ -91,6 +89,7 @@ class Show extends EventEmitter {
 
   get showData() {
     return {
+      training: this.training,
       name: this.name,
       bpm: this.bpm,
       fixtures: this.fixturePool.fixtures.map((f) => f.showData),
@@ -240,15 +239,9 @@ class Show extends EventEmitter {
    *
    * @param {Object} showData hande toa show configuration object
    */
-  prepareOutputs(showData) {
-    if (showData.outputs) {
-      showData.outputs.forEach((o) => {
-        this.outputPool.addRaw({
-          ...o,
-          universe: this.universePool.getFromId(o.universe),
-        });
-      });
-    }
+  prepareOutputs() {
+    // Simulation-only build. Never construct connections, including on import.
+    this.outputPool.clearAll();
   }
 
   /**
@@ -366,6 +359,7 @@ class Show extends EventEmitter {
     this.loading.message = 'Clearing Show Data';
     this.loading.percentage = 20;
     this.clearShowData();
+    this.training = showData.training;
 
     this.loading.message = 'Setting preferences';
     this.loading.percentage = 30;
@@ -399,7 +393,7 @@ class Show extends EventEmitter {
     this.ready = true;
     this.isSaved = true;
 
-    this.persistLocally();
+    // The teaching workbench persists transactionally after a successful load.
   }
 
   /**
@@ -412,9 +406,9 @@ class Show extends EventEmitter {
   async prepareFixtures(showData) {
     for (let i = 0; i < showData.fixtures.length; i++) {
       const fixtureData = showData.fixtures[i];
-      fixtureData.OFLData = JSON.parse(fixtureDataCache[`${fixtureData.manufacturer}/${fixtureData.model}`] || null);
+      fixtureData.OFLData = fixtureData.OFLData || JSON.parse(fixtureDataCache[`${fixtureData.manufacturer}/${fixtureData.model}`] || null);
       if (!fixtureData.OFLData) {
-        const res = await axios.get(`${import.meta.env.VITE_STATIC_URL}fixtures/${fixtureData.manufacturer}/${fixtureData.model}.json`);
+        const res = await axios.get(`${import.meta.env.BASE_URL}fixtures/${fixtureData.manufacturer}/${fixtureData.model}.json`);
         fixtureData.OFLData = res.data;
         fixtureDataCache[`${fixtureData.manufacturer}/${fixtureData.model}`] = JSON.stringify(fixtureData.OFLData);
       }
@@ -432,7 +426,7 @@ class Show extends EventEmitter {
    */
   async preloadFixtureList() {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_STATIC_URL}fixtures/fixture_list.json`);
+      const res = await axios.get(`${import.meta.env.BASE_URL}fixtures/fixture_list.json`);
       this.rawOFLFixtures = res.data;
     } catch (err) {
       console.log('could not fetch fixture list.');

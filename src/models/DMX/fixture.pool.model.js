@@ -94,7 +94,7 @@ class FixturePool extends Proxify {
    */
   addRaw(fixtureData) {
     const fixture = new Fixture(fixtureData);
-    fixture.id = this.genFixtureId();
+    fixture.id = fixtureData.id ?? this.genFixtureId();
     this.fixtures.push(fixture); // TODO: replace with ..AndStackUndo once patched
     return fixture;
   }
@@ -140,14 +140,7 @@ class FixturePool extends Proxify {
    * @returns {Number} The fixture's unique ID
    */
   genFixtureId() {
-    return this.fixtures.reduce(
-      (prev, current) => (
-        (prev && prev.id > current.id)
-          ? prev.id
-          : current.id
-      ),
-      -1,
-    ) + 1;
+    return Math.max(-1, ...this.fixtures.map(item => item.id)) + 1;
   }
 }
 

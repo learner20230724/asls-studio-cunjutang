@@ -35,7 +35,7 @@ MODEL_MATERIAL.onBeforeCompile = (shader) => {
   MODEL_MATERIAL.userData.shader = shader;
 };
 
-const MAX_INSTANCES = 100;
+let MAX_INSTANCES = 32;
 const vector_cam = new THREE.Vector3();
 const vector_beam = new THREE.Vector3();
 const vector_beam_pos = new THREE.Vector3();
@@ -82,27 +82,27 @@ const SHUTTER_STROBE_FREQUENCIES_DEFAULT = {
   FAST: 10,
 };
 
-const position_buffer_attribute = new THREE.InstancedBufferAttribute(
+let position_buffer_attribute = new THREE.InstancedBufferAttribute(
   new Float32Array(MAX_INSTANCES * 3),
   3,
 );
-const direction_buffer_attribute = new THREE.InstancedBufferAttribute(
+let direction_buffer_attribute = new THREE.InstancedBufferAttribute(
   new Float32Array(MAX_INSTANCES * 3),
   3,
 );
-const intensity_buffer_attribute = new THREE.InstancedBufferAttribute(
+let intensity_buffer_attribute = new THREE.InstancedBufferAttribute(
   new Float32Array(MAX_INSTANCES),
   1,
 );
-const color_buffer_attribute = new THREE.InstancedBufferAttribute(
+let color_buffer_attribute = new THREE.InstancedBufferAttribute(
   new Float32Array(MAX_INSTANCES * 3),
   3,
 );
-const emissive_buffer_attribute = new THREE.InstancedBufferAttribute(
+let emissive_buffer_attribute = new THREE.InstancedBufferAttribute(
   new Float32Array(MAX_INSTANCES),
   1,
 );
-const angle_buffer_attribute = new THREE.InstancedBufferAttribute(
+let angle_buffer_attribute = new THREE.InstancedBufferAttribute(
   new Float32Array(MAX_INSTANCES * 2),
   2,
 );
@@ -167,6 +167,7 @@ class MovingHead {
     goboWheel: [],
     colorWheel: [],
   }) {
+    MovingHead.ensureCapacity(instanceCount + 1);
     this._id = instanceCount++;
     this._position = new THREE.Vector3();
     this._rotation = new THREE.Vector3();
@@ -844,6 +845,38 @@ class MovingHead {
     boundingBoxMesh.visible = false;
   }
 
+  /** Grow native instancing buffers without dropping existing matrix / shader data. */
+  static ensureCapacity(required) {
+    if (required <= MAX_INSTANCES) return;
+    while (MAX_INSTANCES < required) MAX_INSTANCES *= 2;
+    const grow = (old) => {
+      const array = new Float32Array(MAX_INSTANCES * old.itemSize);
+      array.set(old.array);
+      const attr = new THREE.InstancedBufferAttribute(array, old.itemSize);
+      attr.setUsage(THREE.DynamicDrawUsage);
+      return attr;
+    };
+    // Dispose VAOs / GPU buffers before installing differently sized attributes.
+    [baseGeo, yokeGeo, headGeo, beamGeo, targetGeo, boundingBoxGeo].forEach(g => g.dispose());
+    position_buffer_attribute = grow(position_buffer_attribute);
+    direction_buffer_attribute = grow(direction_buffer_attribute);
+    intensity_buffer_attribute = grow(intensity_buffer_attribute);
+    color_buffer_attribute = grow(color_buffer_attribute);
+    emissive_buffer_attribute = grow(emissive_buffer_attribute);
+    angle_buffer_attribute = grow(angle_buffer_attribute);
+    [baseGeo, yokeGeo, headGeo].forEach(g => g.setAttribute('highlight', emissive_buffer_attribute));
+    beamGeo.setAttribute('wpos', position_buffer_attribute);
+    beamGeo.setAttribute('direction', direction_buffer_attribute);
+    beamGeo.setAttribute('intensity', intensity_buffer_attribute);
+    beamGeo.setAttribute('color', color_buffer_attribute);
+    beamGeo.setAttribute('angle', angle_buffer_attribute);
+    [baseMesh, yokeMesh, headMesh, beamMesh, capMesh, boundingBoxMesh].filter(Boolean).forEach(mesh => {
+      mesh.dispose();
+      mesh.instanceMatrix = grow(mesh.instanceMatrix);
+      if (mesh.instanceColor) mesh.instanceColor = grow(mesh.instanceColor);
+    });
+  }
+
   static prepareInstanciation(camera, scene) {
     camera_handle = camera;
     scene_handle = scene;
@@ -873,6 +906,12 @@ class MovingHead {
     scene_handle.remove(instance._spotLight);
     scene_handle.remove(instance._dummy);
 
+    const removedIndex = instance.id;
+    for (const attr of [position_buffer_attribute, direction_buffer_attribute, intensity_buffer_attribute, color_buffer_attribute, emissive_buffer_attribute, angle_buffer_attribute]) {
+      attr.array.copyWithin(removedIndex * attr.itemSize, (removedIndex + 1) * attr.itemSize, instanceCount * attr.itemSize);
+      attr.array.fill(0, (instanceCount - 1) * attr.itemSize, instanceCount * attr.itemSize);
+      attr.needsUpdate = true;
+    }
     instances.splice(instance.id, 1);
     for (let i = instance.id; i < instanceCount - 1; i++) {
       instances[i].id--;

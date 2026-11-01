@@ -1,0 +1,32 @@
+{
+  "name": "Teaching spot",
+  "categories": [
+    "Other"
+  ],
+  "physical": {
+    "bulb": {
+      "colorTemperature": 3200
+    },
+    "lens": {
+      "degreesMinMax": [
+        36,
+        36
+      ]
+    }
+  },
+  "modes": [
+    {
+      "name": "Teaching",
+      "channels": [
+        "Dimmer"
+      ]
+    }
+  ],
+  "availableChannels": {
+    "Dimmer": {
+      "capability": {
+        "type": "Intensity"
+      }
+    }
+  }
+}

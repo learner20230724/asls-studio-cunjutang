@@ -39,12 +39,15 @@ export default defineConfig(async () => {
   try {
     await prepareVersioningEnv();
     return {
+      base: './',
+      server: { hmr: false },
       plugins: [
         vue(),
         svgLoader(),
       ],
       resolve: {
         alias: {
+          'events': 'events/',
           '@': path.resolve(pathSegments, './src'),
           '@root': path.resolve(pathSegments, './'),
         },

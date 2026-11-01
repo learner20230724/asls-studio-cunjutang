@@ -222,15 +222,9 @@ class Universe {
    * @return {Boolean} patching capability
    */
   checkPatchCapability(chStart, chCount) {
-    const chStop = chStart + chCount;
-    // eslint-disable-next-line consistent-return
-    Object.keys(this._patch).forEach((fixtureAddress) => {
-      const fixture = this._patch[fixtureAddress];
-      if (chStart <= fixture.chStop && fixture.chStart <= chStop) {
-        return false;
-      }
-    });
-    return true;
+    if (!Number.isInteger(chStart) || chStart < 0 || chCount < 1 || chStart + chCount > 512) return false;
+    return Object.values(this._patch).every(fixture =>
+      chStart + chCount <= fixture.chStart || chStart >= fixture.chStop);
   }
 
   /**
