@@ -69,3 +69,14 @@ location /rehearsal/ {
 - JSON 返回 HTML：检查目录、子路径末尾斜杠以及错误的 SPA 回退规则。
 - 保存失败：浏览器存储受限或配额不足，请立即导出备份。
 - 开发源码更新：手动刷新。为避免 ASLS 全局单例重初始化冲突，已关闭 HMR。
+
+## 规划 Lab 服务器（2026-11-02）
+
+- 正式入口：<https://guihualab.cn/rehearsal/>，导航：<https://guihualab.cn/>。
+- 源码：`/home/ubuntu/apps/asls-studio-cunjutang`；沿用 `codex/cunjutang-zh-training` 分支。
+- 首次执行 `npm ci --include=dev`（构建需要 Vite 等开发依赖）；后续发布命令：`npm run deploy:web`，运行模板生成、测试与构建，将完整 dist 复制到 `/var/www/asls-studio-cunjutang/releases/<UTC时间>/`，原子切换 `current`，保留旧版本。
+- 发布目录由 ubuntu 用户维护。Caddy 直接提供静态文件，无 Node 常驻进程、数据库或硬件输出服务。
+- 实际 Caddy 配置：`/home/ubuntu/guihualab.Caddyfile`，根站点新增 `/rehearsal` 到 `/rehearsal/` 的重定向，（现有 Caddy 版本使用显式匹配器 `redir * /rehearsal/ 308`），以及 `handle_path /rehearsal/*` 静态路径。静态根为 `/var/www/asls-studio-cunjutang/current`，`Cache-Control: no-cache`；不配置 SPA 回退，缺失资源返回 404。
+- 初次路由配置由管理员增量修改，备份并验证配置后，对加载上述文件的 Caddy 进程发 SIGUSR1。常规网页更新无需修改配置或重启服务。
+- 更新沿用同一 HTTPS 来源与存储键，不清空浏览器练习。仍建议定期导出 JSON；浏览器保存不等于服务器存储或跨设备同步。
+- 回滚时将 `current` 原子切换至上一 release 即可，不删除旧 release 或浏览器数据。
