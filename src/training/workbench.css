@@ -8,3 +8,15 @@
 @media(min-width:851px){.panel-heading{padding:16px 20px 8px}.rig-totals{margin-bottom:10px}.zone-list button{padding:5px 10px}.zone-list{padding-bottom:6px}.fixture-browser{min-height:125px}}
 
 @media(max-width:850px){.workbench[data-mobile=controls] .stage-panel{bottom:68%}.workbench[data-mobile=controls] .stage-title{display:none}.workbench[data-mobile=controls] .blackout-banner{top:15px}.workbench[data-mobile=controls] .view-controls{display:flex;top:10px;left:10px}.workbench[data-mobile=controls] .view-controls button{font-size:8px;padding:4px}}
+
+/* Quick testing belongs to the rig, next to the selection it affects. */
+.rig-heading-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.rig-heading-row h2{white-space:nowrap;font-size:16px}
+.auto-test-toggle{font-size:10px;padding:6px 8px;white-space:nowrap;flex-shrink:0}
+.auto-test-toggle.active{color:#f4d499;border-color:#d3ac6a;background:#4a4332}
+.auto-test-level{padding:0 20px 10px;flex-shrink:0}
+.auto-test-level label{display:flex;justify-content:space-between;font-size:10px;color:#aab8b0}
+.auto-test-level output{color:var(--gold);font-variant-numeric:tabular-nums}
+.auto-test-level p{font-size:9px;line-height:1.5}
+.rig-panel .zone-list{overflow-y:auto;min-height:110px;flex-shrink:1}
+@media(max-width:850px){.rig-panel .rig-totals{position:static;margin:0 20px 8px}.auto-test-toggle{padding:8px 12px}.auto-test-level{padding-bottom:8px}.auto-test-level input{height:30px}.rig-panel .zone-list{flex-shrink:0;min-height:0}.rig-heading-row h2{font-size:17px}}

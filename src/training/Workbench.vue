@@ -8,7 +8,7 @@ import {translate} from './i18n.mjs';
 const lang=ref(localStorage.getItem('CJT_LANGUAGE')||'zh'),t=s=>translate(s,lang.value);
 const engine=new TrainingEngine(),host=ref(),fileInput=ref(),ready=ref(false),busy=ref(false),error=ref(''),message=ref(''),pulse=ref(0);
 const selected=ref([]),zone=ref('all'),search=ref(''),solo=ref(false),tab=ref('lights'),mobile=ref('stage'),help=ref(false),showFaults=ref(false),projectName=ref('存菊堂 · 话剧灯光预演');
-const settings=reactive({quality:'auto',fog:false,repair:false,blackout:false,master:1}),stageForm=reactive(clone(DEFAULT_STAGE)),rowText=ref('1.5, 4.25, 7, 9.75, 12.5');
+const settings=reactive({quality:'auto',fog:false,repair:false,blackout:false,master:1,autoOn:false,autoLevel:70}),stageForm=reactive(clone(DEFAULT_STAGE)),rowText=ref('1.5, 4.25, 7, 9.75, 12.5');
 const fixtureForm=reactive({name:'',uid:'',zone:'front',number:1,row:0,block:0,kind:'spot',angle:36,broken:false,x:0,y:0,z:8,tx:0,ty:4,tz:0,baseColor:'#ffd5a3'});
 const objectId=ref(''),stats=reactive({fps:0,fixtures:0,capacity:0,drawCalls:0,geometries:0});
 let renderer,raf,timer,saveTimer;
@@ -30,8 +30,10 @@ function changed(){engine.mark();pulse.value++;}
 watch(lang,v=>{localStorage.setItem('CJT_LANGUAGE',v);document.documentElement.lang=v==='en'?'en':'zh-CN';});
 watch(settings,()=>{if(!ready.value)return;Object.assign(engine.training.settings,settings);renderer?.setQuality(settings.quality);changed();},{deep:true});
 watch(selected,()=>{const f=picked.value[0];if(f)Object.assign(fixtureForm,{name:f.name,uid:f.training.uid,zone:f.training.zone,number:f.training.number,row:f.training.row||0,block:f.training.block||0,kind:f.training.kind,angle:f.training.angle,broken:f.training.broken,...f.position,tx:f.training.target.x,ty:f.training.target.y,tz:f.training.target.z,baseColor:f.training.baseColor});fixtureBaseline=clone(fixtureForm);});
-function pick(id,multi=false){selected.value=multi?(selected.value.includes(id)?selected.value.filter(v=>v!==id):[...selected.value,id]):[id];tab.value='lights';mobile.value='controls';}
-function pickZone(id){zone.value=id;selected.value=fixtures.value.filter(f=>id==='all'||f.training.zone===id).map(f=>f.id);}
+function applyAutoTest(){if(settings.autoOn&&ready.value&&selected.value.length){engine.setLevel(selected.value,Math.round(settings.autoLevel*255/100));pulse.value++;}}
+function toggleAutoTest(){settings.autoOn=!settings.autoOn;applyAutoTest();}
+function pick(id,multi=false){selected.value=multi?(selected.value.includes(id)?selected.value.filter(v=>v!==id):[...selected.value,id]):[id];tab.value='lights';mobile.value='controls';applyAutoTest();}
+function pickZone(id){zone.value=id;selected.value=fixtures.value.filter(f=>id==='all'||f.training.zone===id).map(f=>f.id);applyAutoTest();}
 function sync(){projectName.value=engine.show.name;Object.assign(settings,engine.training.settings);Object.assign(stageForm,clone(engine.training.stage));rowText.value=stageForm.rows.join(', ');renderer.build(engine.training.stage,engine.training.objects,engine.fixtures);selected.value=selected.value.filter(id=>engine.fixtures.some(f=>f.id===id));pulse.value++;}
 async function run(fn,rebuild=false){if(busy.value)return;busy.value=true;error.value='';try{await fn();if(rebuild)sync();pulse.value++;}catch(e){error.value=`${t('操作失败')}：${e.message}`;console.error(e);}finally{busy.value=false;}}
 function save(){if(engine.save(true))note('本机已保存');else error.value=t('保存失败，请导出备份');pulse.value++;}
@@ -72,7 +74,8 @@ onBeforeUnmount(()=>{cancelAnimationFrame(raf);clearInterval(timer);clearInterva
     </header>
     <div class="workspace" :inert="!ready||busy">
       <aside class="rig-panel">
-        <div class="panel-heading"><span class="eyebrow">01 / LIGHTING RIG</span><h2>{{t('灯位分区')}}</h2><p>{{t('按台上面朝观众编号')}}</p></div>
+        <div class="panel-heading"><span class="eyebrow">01 / LIGHTING RIG</span><div class="rig-heading-row"><h2>{{t('灯位分区')}}</h2><button class="auto-test-toggle" :class="{active:settings.autoOn}" :aria-label="t('选中自动开灯')" :aria-pressed="settings.autoOn" @click="toggleAutoTest">{{t('选中即亮')}}</button></div><p>{{t('按台上面朝观众编号')}}</p></div>
+        <div class="auto-test-level"><label for="auto-test-level">{{t('试灯亮度')}}<output for="auto-test-level">{{settings.autoLevel}}%</output></label><input id="auto-test-level" type="range" min="0" max="100" step="1" v-model.number="settings.autoLevel" :aria-label="t('试灯亮度')" @input="applyAutoTest"><p>{{t(settings.autoOn?'选中灯具或分区即按此亮度打开':'打开后，选中灯具或分区即可试灯')}}</p></div>
         <div class="rig-totals"><span><strong>{{fixtures.length}}</strong>{{t('盏灯')}}</span><span class="fault-total"><strong>{{broken}}</strong>{{t('盏故障')}}</span></div>
         <div class="zone-list"><button :class="{active:zone==='all'}" @click="pickZone('all')"><span>◎ {{t('全部灯具')}}</span><b>{{fixtures.length}}</b></button><button v-for="z in zones" :key="z.id" :class="{active:zone===z.id}" @click="pickZone(z.id)"><span><i class="zone-dot" :class="{bad:z.bad}"></i>{{t(z.name)}}</span><span><em v-if="z.bad">{{z.bad}}</em><b>{{z.count}}</b></span></button></div>
         <div class="fixture-browser"><input class="search" :placeholder="t('搜索灯具名称或编号')" v-model="search" :aria-label="t('搜索灯具名称或编号')"><label class="check small"><input type="checkbox" v-model="showFaults">{{t('故障灯')}} <span>{{filtered.length}}</span></label>

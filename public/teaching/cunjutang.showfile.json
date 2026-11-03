@@ -34282,7 +34282,9 @@
       "fog": false,
       "repair": false,
       "blackout": false,
-      "master": 1
+      "master": 1,
+      "autoOn": false,
+      "autoLevel": 70
     },
     "cueTimes": {
       "20:0": 2,
