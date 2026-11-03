@@ -2,6 +2,7 @@
 import {ref,reactive,computed,onMounted,onBeforeUnmount,watch} from 'vue';
 import {TrainingEngine} from './engine';
 import {StageRenderer} from './renderer';
+import {DemandLoop} from './demand-loop.mjs';
 import {createTemplate,clone,LABELS,TYPES,DEFAULT_STAGE} from './rig.mjs';
 import {translate} from './i18n.mjs';
 
@@ -11,7 +12,12 @@ const selected=ref([]),zone=ref('all'),search=ref(''),solo=ref(false),tab=ref('l
 const settings=reactive({quality:'auto',fog:false,repair:false,blackout:false,master:1,autoOn:false,autoLevel:70}),stageForm=reactive(clone(DEFAULT_STAGE)),rowText=ref('1.5, 4.25, 7, 9.75, 12.5');
 const fixtureForm=reactive({name:'',uid:'',zone:'front',number:1,row:0,block:0,kind:'spot',angle:36,broken:false,x:0,y:0,z:8,tx:0,ty:4,tz:0,baseColor:'#ffd5a3'});
 const objectId=ref(''),stats=reactive({fps:0,fixtures:0,capacity:0,drawCalls:0,geometries:0});
-let renderer,raf,timer,saveTimer;
+let renderer,loop,saveTimer,refineTimer;
+let refining=false;
+let internalPulse=false,lastUI=0;
+function refreshUI(){internalPulse=true;pulse.value++;internalPulse=false;}
+function invalidate(){clearTimeout(refineTimer);refining=false;loop?.invalidate();}
+function queueSave(){clearTimeout(saveTimer);if(!ready.value)return;saveTimer=setTimeout(()=>{if(engine.dirty&&!busy.value&&!engine.transition){engine.save();refreshUI();}else if(engine.dirty)queueSave();},2000);}
 let fixtureBaseline={};
 const fixtures=computed(()=>{pulse.value;return ready.value?engine.fixtures:[];});
 const picked=computed(()=>fixtures.value.filter(f=>selected.value.includes(f.id)));
@@ -28,7 +34,10 @@ const dirty=computed(()=>{pulse.value;return engine.dirty;});
 function note(s){message.value=t(s);setTimeout(()=>message.value='',3500);}
 function changed(){engine.mark();pulse.value++;}
 watch(lang,v=>{localStorage.setItem('CJT_LANGUAGE',v);document.documentElement.lang=v==='en'?'en':'zh-CN';});
-watch(settings,()=>{if(!ready.value)return;Object.assign(engine.training.settings,settings);renderer?.setQuality(settings.quality);changed();},{deep:true});
+watch(settings,()=>{if(!ready.value)return;Object.assign(engine.training.settings,settings);changed();},{deep:true});
+watch(()=>settings.quality,q=>renderer?.setQuality(q));
+watch(pulse,()=>{if(!internalPulse)invalidate();},{flush:'sync'});
+watch([selected,solo],invalidate,{deep:true});
 watch(selected,()=>{const f=picked.value[0];if(f)Object.assign(fixtureForm,{name:f.name,uid:f.training.uid,zone:f.training.zone,number:f.training.number,row:f.training.row||0,block:f.training.block||0,kind:f.training.kind,angle:f.training.angle,broken:f.training.broken,...f.position,tx:f.training.target.x,ty:f.training.target.y,tz:f.training.target.z,baseColor:f.training.baseColor});fixtureBaseline=clone(fixtureForm);});
 function applyAutoTest(){if(settings.autoOn&&ready.value&&selected.value.length){engine.setLevel(selected.value,Math.round(settings.autoLevel*255/100));pulse.value++;}}
 function toggleAutoTest(){settings.autoOn=!settings.autoOn;applyAutoTest();}
@@ -58,10 +67,25 @@ function deleteCue(i){if(confirm(lang.value==='en'?'Delete this lighting cue?':'
 function cueTime(item,event){const v=Number(event.target.value);engine.training.cueTimes[item.key]=Math.min(120,Math.max(0,Number.isFinite(v)?v:2));changed();}
 function cueTimeValue(item){return engine.training.cueTimes[item.key]??2;}
 function blackout(){engine.stop();settings.blackout=!settings.blackout;}
-function startLoop(now){if(ready.value){engine.update(now);renderer.update(engine.fixtures,settings,selected.value,solo.value);renderer.render();}raf=requestAnimationFrame(startLoop);}
+function draw(now){
+  if(!ready.value)return;
+  const refine=refining;refining=false;clearTimeout(refineTimer);
+  renderer.setInteractive(!refine);
+  engine.update(now);renderer.update(engine.fixtures,settings,selected.value,solo.value);renderer.render();
+  if(now-lastUI>120||!engine.animating){lastUI=now;refreshUI();Object.assign(stats,renderer.stats);}
+  if(!refine&&!engine.animating)refineTimer=setTimeout(()=>{refining=true;loop?.invalidate();},220);
+}
+function visibilityChanged(){clearTimeout(refineTimer);const visible=!document.hidden;engine.setVisible(visible);loop?.setVisible(visible);}
 function unload(){if(ready.value)engine.save();}
-onMounted(async()=>{await run(async()=>{renderer=new StageRenderer(host.value,pick);engine.show.visualizerHandle=renderer;await engine.init();ready.value=true;sync();renderer.view('audience');if(engine.status)error.value=engine.status;});raf=requestAnimationFrame(startLoop);timer=setInterval(()=>{pulse.value++;if(renderer)Object.assign(stats,renderer.stats);},300);saveTimer=setInterval(()=>{if(ready.value&&engine.dirty&&!busy.value&&!engine.transition)engine.save();},2000);window.addEventListener('pagehide',unload);if(import.meta.env.DEV)window.__CJT={engine,get renderer(){return renderer;},sync,select:ids=>selected.value=ids,settings,get selected(){return selected.value;},get ready(){return ready.value;}};});
-onBeforeUnmount(()=>{cancelAnimationFrame(raf);clearInterval(timer);clearInterval(saveTimer);engine.stop();renderer?.dispose();window.removeEventListener('pagehide',unload);});
+onMounted(async()=>{
+  engine.onChange=()=>{invalidate();queueSave();};
+  await run(async()=>{renderer=new StageRenderer(host.value,pick,invalidate);engine.show.visualizerHandle=renderer;await engine.init();ready.value=true;sync();renderer.setQuality(settings.quality);renderer.view('audience');if(engine.status)error.value=engine.status;});
+  loop=new DemandLoop({draw,active:()=>engine.animating});visibilityChanged();invalidate();queueSave();
+  window.addEventListener('pagehide',unload);document.addEventListener('visibilitychange',visibilityChanged);
+  if(import.meta.env.DEV)window.__CJT={engine,get renderer(){return renderer;},get loop(){return loop;},invalidate,sync,select:ids=>selected.value=ids,settings,get selected(){return selected.value;},get ready(){return ready.value;}};
+});
+onBeforeUnmount(()=>{loop?.dispose();clearTimeout(refineTimer);clearTimeout(saveTimer);engine.onChange=null;engine.stop();renderer?.dispose();window.removeEventListener('pagehide',unload);document.removeEventListener('visibilitychange',visibilityChanged);});
+
 </script>
 
 <template>
@@ -88,7 +112,7 @@ onBeforeUnmount(()=>{cancelAnimationFrame(raf);clearInterval(timer);clearInterva
         <div class="view-controls"><button v-for="v in [['audience','观众斜视'],['front','观众正视'],['top','俯视'],['left','左侧'],['right','右侧']]" :key="v[0]" @click="renderer?.view(v[0])">{{t(v[1])}}</button><button @click="renderer?.view('audience')" :title="t('复位')">↺</button></div>
         <div class="selection-pill" v-if="selected.length"><span>{{t('已选择')}} <b>{{selected.length}}</b></span><button :class="{active:solo}" @click="solo=!solo">{{t('只看所选')}}</button><button @click="selected=[]" :aria-label="t('取消选择')">×</button></div>
         <div class="blackout-banner" v-if="settings.blackout">{{t('总黑场')}} <button @click="blackout">{{t('恢复输出')}}</button></div>
-        <div class="stage-caption"><span class="desktop-hint">{{t('鼠标拖动旋转 · 滚轮缩放 · 点击选灯')}}</span><span class="touch-hint">{{t('手指拖动旋转 · 双指缩放')}}</span><span>{{stats.fps}} FPS <i class="live-dot"></i></span></div>
+        <div class="stage-caption"><span class="desktop-hint">{{t('鼠标拖动旋转 · 滚轮缩放 · 点击选灯')}}</span><span class="touch-hint">{{t('手指拖动旋转 · 双指缩放')}}</span><span>{{t('节能预览')}} <i class="live-dot"></i></span></div>
         <div v-if="!ready" class="loading-cover"><div class="loader"></div>{{error||t('正在加载舞台…')}}</div>
       </main>
       <aside class="control-panel">

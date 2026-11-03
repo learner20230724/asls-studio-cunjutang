@@ -120,6 +120,7 @@ class Live {
         this._state = LIVE_STATES.IDLE;
         break;
       case LIVE_STATES.PLAYING:
+        if(this._state===LIVE_STATES.PAUSED||this._state===LIVE_STATES.IDLE)this.pauseTimeOffset=performance.now()-this.pauseStartTime;
         this._state = LIVE_STATES.PLAYING;
         break;
       case LIVE_STATES.PAUSED:
@@ -128,6 +129,15 @@ class Live {
         break;
       default: break;
     }
+    this.syncClock();
+  }
+
+  syncClock() {
+    const active=this.animations.length>0&&this.state===LIVE_STATES.PLAYING&&!this.suspended;
+    if(this.animationMethod===ANIMATION_METHODS.WW)this.w?.postMessage({active});
+    else if(active&&this.rafID==null)this.rafID=requestAnimationFrame(this.update.bind(this));
+    else if(!active&&this.rafID!=null){cancelAnimationFrame(this.rafID);this.rafID=null;}
+    this.onActivity?.();
   }
 
   get state() {
@@ -145,6 +155,8 @@ class Live {
    * @type {number}
    */
   set animationMethod(method) {
+    if(this.rafID!=null){cancelAnimationFrame(this.rafID);this.rafID=null;}
+    this.w?.postMessage({active:false});
     this._animationMethod = method;
     switch (this.animationMethod) {
       case ANIMATION_METHODS.WW:
@@ -158,6 +170,7 @@ class Live {
         break;
       default: break;
     }
+    this.syncClock();
   }
 
   get animationMethod() {
@@ -232,8 +245,9 @@ class Live {
     } else {
       this.pauseTimeOffset = time - this.pauseStartTime;
     }
+    this.rafID=null;
     this.processing = false;
-    if (this.animationMethod === ANIMATION_METHODS.RAF) {
+    if (this.animationMethod === ANIMATION_METHODS.RAF && this.animations.length && !this.suspended) {
       this.rafID = requestAnimationFrame(this.update.bind(this));
     }
   }
@@ -260,11 +274,13 @@ class Live {
         }
       }), animationId);
       this.animations.push(animation);
+      this.syncClock();
       return animationId;
     }
     quantizeReadyCallback();
     const animation = new Animation(updateFunction, this.genAnimationId(), fps);
     this.animations.push(animation);
+    this.syncClock();
     return animation.id;
   }
 
@@ -278,6 +294,7 @@ class Live {
     const animationIndex = this.animations.findIndex((item) => item.id === Number(animationId));
     if (animationIndex > -1) {
       this.animations.splice(animationIndex, 1);
+      this.syncClock();
     } else {
       throw new Error('Could not find animation in animation pool');
     }

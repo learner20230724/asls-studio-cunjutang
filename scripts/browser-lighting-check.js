@@ -21,6 +21,7 @@ async (page) => {
       const pixels=new Uint16Array(5*5*4);r.renderer.readRenderTargetPixels(target,x,y,5,5,pixels);
       let sum=0;for(let i=0;i<pixels.length;i+=4)sum+=THREE.DataUtils.fromHalfFloat(pixels[i])+THREE.DataUtils.fromHalfFloat(pixels[i+1])+THREE.DataUtils.fromHalfFloat(pixels[i+2]);return sum/75;
     };
+    const sceneSample=point=>sample(point,r.target)+sample(point,r.hazeTarget);
     const camera=(position,target)=>{r.controls.enableDamping=false;r.controls.target.set(...target);r.camera.position.set(...position);r.controls.update();};
     try{
       r.build(DEFAULT_STAGE,[],[f]);camera([10,-14,13],[0,5,0]);render();const lit=sample([0,5,.01],r.target);
@@ -28,13 +29,13 @@ async (page) => {
       assert('front light illuminates stage floor without haze',lit>dark*2&&lit>dark+.02,{lit,dark});
       f.position={x:0,y:8,z:3};f.training.target={x:0,y:20,z:3};f._3DModel.intensity=1;
       camera([0,22,3],[0,12,3]);settings.fog=false;render();const baseline=sample([0,17,3],r.target);
-      settings.fog=true;render();const blocked=sample([0,17,3],r.composite);
-      r.blockerUniforms.blockerCount.value=0;render();const unblocked=sample([0,17,3],r.composite);
+      settings.fog=true;render();const blocked=sceneSample([0,17,3]);
+      r.blockerUniforms.blockerCount.value=0;render();const unblocked=sceneSample([0,17,3]);
       assert('haze is visible when the wall blocker is deliberately disabled',unblocked>baseline+.01,{unblocked,baseline});
       assert('wall prevents haze escaping toward an outside camera',Math.abs(blocked-baseline)<.002,{blocked,baseline,unblocked});
       r.blockerUniforms.blockerCount.value=r.blockers.length;
       camera([5,12,3],[0,12,3]);settings.fog=false;render();const insideDark=sample([0,12,3],r.target);
-      settings.fog=true;render();const insideHaze=sample([0,12,3],r.composite);
+      settings.fog=true;render();const insideHaze=sceneSample([0,12,3]);
       assert('haze remains visible on the source side of the wall',insideHaze>insideDark+.005,{insideHaze,insideDark});
       settings.fog=false;f.training.target={x:0,y:18,z:0};
       r.box(r.lit,[4,4,.2],[0,18,-.1],'#ffffff',true);

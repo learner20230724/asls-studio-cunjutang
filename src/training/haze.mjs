@@ -15,7 +15,7 @@ void main(){
 
 export const hazeFragment=`
 precision highp float;
-uniform sampler2D sceneDepth;uniform vec2 resolution;
+uniform sampler2D sceneDepth;uniform vec2 resolution;uniform int sampleCount;
 uniform mat4 inverseProjection;uniform mat4 cameraWorld;
 varying vec3 apex;varying vec3 axis;varying vec3 energy;
 varying float range;varying float edge;
@@ -53,8 +53,9 @@ void main(){
   vec3 surface=(cameraWorld*vec4(viewSurface.xyz/viewSurface.w,1.)).xyz;
   leave=min(leave,dot(surface-cameraPosition,ray)-.003);
   if(leave<=enter)discard;
-  float stepSize=(leave-enter)/12.;float sum=0.;
+  float stepSize=(leave-enter)/float(sampleCount);float sum=0.;
   for(int s=0;s<12;s++){
+    if(s>=sampleCount)break;
     vec3 point=cameraPosition+ray*(enter+(float(s)+.5)*stepSize);
     vec3 lightRay=point-apex;float distance=length(lightRay);
     float weight=spotWeight(dot(lightRay/max(distance,.001),axis),edge);

@@ -1,4 +1,5 @@
 import Show from '../singletons/show.singleton';
+import Live from '../models/DMX/live.model';
 import Fixture from '../models/DMX/fixture.model';
 import { ProxifySingleton } from '../models/utils/proxify.utils';
 import { TeachingLight } from './renderer';
@@ -7,7 +8,7 @@ import { clone, createTemplate, normalizeShow, blankGroup, profile, repatch, uni
 export const STORAGE_KEY='CUNJUTANG_SHOW_V1';
 Fixture.modelFactory=f=>new TeachingLight(f);
 export class TrainingEngine {
-  constructor(){this.show=Show;this.show.visualizerHandle={preferences:{},showData:{}};this.active=-1;this.playing=false;this.transition=null;this.original={};this.dirty=false;this.status='';}
+  constructor(){this.show=Show;this.show.visualizerHandle={preferences:{},showData:{}};this.active=-1;this.playing=false;this.transition=null;this.original={};this.dirty=false;this.status='';this.onChange=null;Live.onActivity=()=>this.onChange?.();}
   get fixtures(){return this.show.fixturePool.fixtures;}
   get groups(){return this.show.groupPool.groups;}
   get training(){return this.show.training;}
@@ -23,7 +24,9 @@ export class TrainingEngine {
   async init(){const saved=localStorage.getItem(STORAGE_KEY);if(saved){try{await this.load(JSON.parse(saved));return;}catch(e){this.status=`未覆盖原保存，已载入模板 / Saved file retained: ${e.message}`;this.recoveryBlocked=true;}}await this.load(createTemplate());this.go(0,true);}
   snapshot(){const data={...clone(this.original),...clone(this.show.showData)};data.training.currentChannels=Object.fromEntries(this.fixtures.map(f=>[f.id,f.channels.map(c=>c.value.DMX)]));data.outputs=[];data.selectedOutputs=[];return data;}
   save(force=false){if(this.recoveryBlocked&&!force)return false;try{localStorage.setItem(STORAGE_KEY,JSON.stringify(this.snapshot()));this.recoveryBlocked=false;this.dirty=false;return true;}catch(e){this.status='浏览器保存失败，请导出备份 / Storage full: export a backup';return false;}}
-  mark(){this.dirty=true;}
+  get animating(){return !!(this.transition||this.playing||(Live.animations.length&&Live.state===1&&!Live.suspended));}
+  setVisible(visible){Live.suspended=!visible;Live.syncClock();}
+  mark(){this.dirty=true;this.onChange?.();}
   setLevel(ids,value){this.stop();const n=Math.max(0,Math.min(255,Number(value)));for(const f of this.fixtures.filter(f=>ids.includes(f.id)))if(f.hasDimmer)f.setQuickAccessor({type:'Dimmer',qaIndex:0},n);this.mark();}
   setColor(ids,hex){this.stop();const rgb=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));for(const f of this.fixtures.filter(f=>ids.includes(f.id)))if(f.hasColor)f.color=rgb;this.mark();}
   setAim(ids,key,value){this.stop();for(const f of this.fixtures.filter(f=>ids.includes(f.id)&&f.training.kind==='moving'))f.setQuickAccessor({type:key,qaIndex:0},Number(value));this.mark();}
@@ -35,7 +38,7 @@ export class TrainingEngine {
   go(index,instant=false,continuing=false){if(!continuing)this.stop();const item=this.cues[index];if(!item)return;this.active=index;item.cue.direction=0;item.cue.state=0;item.cue.relative=1;item.cue.update(0,1);const ms=Math.max(1,(this.training.cueTimes[item.key]??2)*1000);this.transition={item,start:performance.now(),ms};if(instant){item.cue.update(ms,ms);this.transition=null;}this.mark();}
   play(){if(!this.cues.length)return;this.stop();this.playing=true;this.go(this.active<0?0:this.active,false,true);}
   stop(){this.playing=false;this.transition=null;this.nextAt=null;for(const g of this.groups){g.chasePool.chases.forEach(c=>c.cue(false));g.cuePool.cues.forEach(c=>{if(c.animationId!=null)c.cue(false);});}}
-  update(now){if(this.transition){const {item,start,ms}=this.transition;item.cue.update(Math.min(now-start,ms),ms);if(now-start>=ms){this.transition=null;this.nextAt=now+2000;this.mark();}}if(this.playing&&!this.transition&&this.nextAt&&now>=this.nextAt){if(this.active+1<this.cues.length)this.go(this.active+1,false,true);else this.stop();}}
+  update(now){if(this.transition){const {item,start,ms}=this.transition;item.cue.update(Math.max(0,Math.min(now-start,ms)),ms);if(now-start>=ms){this.transition=null;this.nextAt=now+2000;this.mark();}}if(this.playing&&!this.transition&&this.nextAt&&now>=this.nextAt){if(this.active+1<this.cues.length)this.go(this.active+1,false,true);else this.stop();}}
   async editFixtures(ids,patch){const d=this.snapshot();for(const f of d.fixtures.filter(f=>ids.includes(f.id))){if(patch.name!==undefined)f.name=patch.name;if(patch.position)f.position={...f.position,...patch.position};f.training={...f.training,...patch.training,target:{...f.training.target,...patch.training?.target}};if(patch.training?.kind){const oldKeys=Object.keys(f.OFLData.availableChannels);const oldValues=d.training.currentChannels[f.id]||[];f.OFLData=profile(f.training.kind,f.training.angle);f.model=f.training.kind;f.manufacturer='cunjutang';f.mode='Teaching';f.category=f.training.kind==='moving'?'Moving Head':'Other';const keys=Object.keys(f.OFLData.availableChannels);d.training.currentChannels[f.id]=keys.map(k=>oldKeys.includes(k)?oldValues[oldKeys.indexOf(k)]||0:k==='Pan'||k==='Tilt'?128:k==='Dimmer'?0:255);
         for(const g of d.groups)for(const c of g.cues){const fv=c.fixtureValues?.find(v=>v.fixture.id===f.id);if(fv)fv.channelValues=fv.channelValues.filter(v=>keys.includes(v.type)||v.type==='Color'&&keys.includes(v.color)).map(v=>({...v,id:keys.indexOf(v.type==='Color'?v.color:v.type)+1}));}
       }}repatch(d.fixtures);await this.load(d);}
