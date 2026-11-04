@@ -26,7 +26,7 @@ export class StageRenderer {
   constructor(host,onSelect,onInvalidate=()=>{}){
     this.onInvalidate=onInvalidate;
     this.host=host;this.onSelect=onSelect;this.decor=new THREE.Scene();this.lit=new THREE.Scene();this.beamsScene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(43,1,.1,220);this.camera.up.set(0,0,1);
-    this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setClearColor(new THREE.Color(.055,.075,.09));this.renderer.outputColorSpace=THREE.LinearSRGBColorSpace;this.renderer.autoClear=false;host.appendChild(this.renderer.domElement);
+    this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setClearColor(new THREE.Color(.0028,.003,.0032));this.renderer.outputColorSpace=THREE.LinearSRGBColorSpace;this.renderer.autoClear=false;host.appendChild(this.renderer.domElement);
     this.target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:2,depthTexture:new THREE.DepthTexture(1,1,THREE.UnsignedIntType)});
     this.hazeTarget=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,depthBuffer:false});
     this.postScene=new THREE.Scene();this.postCamera=new THREE.Camera();
@@ -91,7 +91,7 @@ export class StageRenderer {
     this.asyncLighting?.reset();this.fogField?.dispose();this.fogField=new FogField(stage);this.shadows?.dispose();this.shadows=new BeamShadows(this.capacity);this.surfaceLighting=new SurfaceLighting();this.blockerRevision=(this.blockerRevision||0)+1;this.venueShapes=venueBlockers(stage);this.stageBlockers=[...this.venueShapes,...curtainBoxes(stage,curtains)];this.blockers=[...this.stageBlockers,...objectBlockers(objects)];
     this.blockerUniforms={blockerCount:{value:this.blockers.length}};
     for(const b of this.venueShapes)this.box(b.lit?this.lit:this.decor,b.size,b.center,b.color,b.lit);
-    this.box(this.decor,[180,180,.3],[0,0,-.75],'#48545c');
+    this.box(this.decor,[180,180,.3],[0,0,-.75],'#20201f');
     this.box(this.decor,[w+.3,d+.3,.3],[0,d/2,-.35],'#151c1c');
     for(const y of stage.rows){this.box(this.decor,[w+1,.12,.12],[0,y,h+.25],'#465051');for(const x of [-w/2,w/2])this.box(this.decor,[.06,.06,1.1],[x,y,h+.8],'#374044');}
     this.box(this.decor,[w+1,.14,.14],[0,-4,h+.3],'#41494c');

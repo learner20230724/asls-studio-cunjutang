@@ -34246,6 +34246,7 @@
   "training": {
     "version": 1,
     "layoutVersion": 2,
+    "propsVersion": 1,
     "curtains": [
       {
         "id": "first",
@@ -34302,6 +34303,51 @@
         "x": -2,
         "y": 4,
         "rotation": 0
+      },
+      {
+        "id": "stage-table",
+        "kind": "table",
+        "name": "会客桌",
+        "x": 0,
+        "y": 5,
+        "rotation": 0,
+        "demoProp": "table"
+      },
+      {
+        "id": "stage-chair-left",
+        "kind": "chair",
+        "name": "左侧座椅",
+        "x": -1.3,
+        "y": 4.3,
+        "rotation": 20,
+        "demoProp": "chair-left"
+      },
+      {
+        "id": "stage-chair-right",
+        "kind": "chair",
+        "name": "右侧座椅",
+        "x": 1.3,
+        "y": 4.3,
+        "rotation": -20,
+        "demoProp": "chair-right"
+      },
+      {
+        "id": "stage-platform-left",
+        "kind": "block",
+        "name": "左侧矮台",
+        "x": -4.8,
+        "y": 6,
+        "rotation": 0,
+        "demoProp": "platform-left"
+      },
+      {
+        "id": "stage-platform-right",
+        "kind": "block",
+        "name": "右侧矮台",
+        "x": 4.8,
+        "y": 6,
+        "rotation": 0,
+        "demoProp": "platform-right"
       }
     ],
     "settings": {

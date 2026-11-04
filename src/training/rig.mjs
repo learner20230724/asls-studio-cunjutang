@@ -1,3 +1,4 @@
+import {defaultProps,needsDefaultProps,addDefaultProps} from './default-props.mjs';
 import {validateStageState,validateAims} from './scene-state.mjs';
 import {defaultCurtains,migrateVenue} from './venue-layout.mjs';
 // Parametric venue template. Z is up; +X is actor-left, +Y is upstage.
@@ -60,7 +61,7 @@ export function createTemplate(){
   const levels=[f=>f.training.zone==='front'?170:f.training.zone==='top-1'?45:0,f=>f.training.zone==='front'?95:f.training.zone.startsWith('ear')?150:0,f=>f.training.zone.startsWith('side')?210:f.training.zone==='front'?40:0,()=>0];
   ['人物面光','双人对话','侧光塑形','换场暗场'].forEach((name,id)=>all.cues.push({id,name,type:0,duration:1,relative:1,fixtureValues:fixtures.map(f=>({fixture:{id:f.id},channelValues:Object.keys(f.OFLData.availableChannels).map((key,i)=>({id:i+1,type:['Red','Green','Blue'].includes(key)?'Color':key,qaIndex:['Red','Green','Blue'].includes(key)?['Red','Green','Blue'].indexOf(key):0,color:['Red','Green','Blue'].includes(key)?key:null,value:key==='Dimmer'?levels[id](f):['Pan','Tilt'].includes(key)?128:255,active:true}))}))}));
   groups.push(all);
-  return {name:'存菊堂 · 话剧灯光预演',bpm:120,fixtures,universes:universesFor(fixtures),groups,outputs:[],visualizer:{globalBrightness:15,globalFoggingState:0},training:{version:1,layoutVersion:2,curtains:defaultCurtains(DEFAULT_STAGE),source:'存菊堂口述灯位 / 2026-11-02',stage:clone(DEFAULT_STAGE),objects:[{id:'actor-1',kind:'actor',name:'演员 A',x:2,y:4,rotation:0},{id:'actor-2',kind:'actor',name:'演员 B',x:-2,y:4,rotation:0}],settings:{quality:'auto',fog:false,repair:false,blackout:false,master:1,autoOn:false,autoLevel:70},cueTimes:{'20:0':2,'20:1':2,'20:2':3,'20:3':2},cueStages:{},currentChannels:{},note:'左耳光镜像、尺寸、灯高、朝向、灯具型号及能力为教学估算，可修改；不代表实测。'}};
+  return {name:'存菊堂 · 话剧灯光预演',bpm:120,fixtures,universes:universesFor(fixtures),groups,outputs:[],visualizer:{globalBrightness:15,globalFoggingState:0},training:{version:1,layoutVersion:2,propsVersion:1,curtains:defaultCurtains(DEFAULT_STAGE),source:'存菊堂口述灯位 / 2026-11-02',stage:clone(DEFAULT_STAGE),objects:[{id:'actor-1',kind:'actor',name:'演员 A',x:2,y:4,rotation:0},{id:'actor-2',kind:'actor',name:'演员 B',x:-2,y:4,rotation:0},...defaultProps(DEFAULT_STAGE)],settings:{quality:'auto',fog:false,repair:false,blackout:false,master:1,autoOn:false,autoLevel:70},cueTimes:{'20:0':2,'20:1':2,'20:2':3,'20:3':2},cueStages:{},currentChannels:{},note:'左耳光镜像、尺寸、灯高、朝向、灯具型号及能力为教学估算，可修改；不代表实测。'}};
 }
 export function effectiveIntensity(value,broken,settings={},soloPass=true){return settings.blackout||!soloPass||(broken&&!settings.repair)?0:Math.min(1,Math.max(0,Number(value)||0))*Math.min(1,Math.max(0,settings.master??1));}
 export function nextCapacity(count){let capacity=32;while(capacity<count)capacity*=2;return capacity;}
@@ -90,7 +91,7 @@ export function normalizeShow(raw){
     const members=new Set();for(const f of g.fixtures){if(!ids.has(f.id)||members.has(f.id))throw new Error('分组引用不存在或重复的灯 / Invalid group reference');members.add(f.id);}
     const cueIds=new Set();for(const cue of g.cues){if(!Number.isInteger(cue.id)||cueIds.has(cue.id)||![0,1].includes(cue.type))throw new Error('场景 ID 或类型不合法 / Invalid cue');cueIds.add(cue.id);for(const fv of cue.fixtureValues||[]){if(!members.has(fv.fixture?.id)||!Array.isArray(fv.channelValues))throw new Error('场景引用不合法 / Invalid cue fixture');for(const c of fv.channelValues)if(!Number.isFinite(Number(c.value))||Number(c.value)<0||Number(c.value)>255)throw new Error('场景通道应为 0–255 / Invalid channel value');}}
   }
-  const savedCurtains=d.training?.curtains;
+  const savedCurtains=d.training?.curtains,addProps=needsDefaultProps(d.training);
   const defaults=createTemplate().training;
   if(d.training&&d.training.version!==1)throw new Error('不支持的工程版本 / Unsupported version');
   d.training={...defaults,...d.training,objects:d.training?.objects||[],settings:{...defaults.settings,...d.training?.settings},currentChannels:d.training?.currentChannels||{},cueTimes:d.training?.cueTimes||{}};
@@ -109,6 +110,7 @@ export function normalizeShow(raw){
   const objectIds=new Set();for(const o of d.training.objects){if(!o.id||objectIds.has(o.id)||!['actor','table','chair','block'].includes(o.kind)||!Number.isFinite(o.x)||!Number.isFinite(o.y)||!Number.isFinite(o.rotation))throw new Error('舞台对象不合法 / Invalid stage object');objectIds.add(o.id);}
   if(d.training.cueHolds!==undefined&&(!d.training.cueHolds||typeof d.training.cueHolds!=='object'||Array.isArray(d.training.cueHolds)))throw Error('场景停留时间格式不正确');
   for(const v of Object.values(d.training.cueHolds||{}))if(!Number.isFinite(v)||v<0||v>120)throw Error('场景停留时间应为 0–120 秒');
+  if(addProps)addDefaultProps(d.training);
   for(const v of Object.values(d.training.cueTimes))if(!Number.isFinite(v)||v<0||v>120)throw new Error('渐变时间应为 0–120 秒 / Invalid fade time');
   const settings=d.training.settings;
   if(settings.quality==='low')settings.quality='auto';
