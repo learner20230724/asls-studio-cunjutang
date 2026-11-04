@@ -2,8 +2,12 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { effectiveIntensity, nextCapacity } from './rig.mjs';
-import { venueBlockers, MAX_BLOCKERS, visibilityGLSL } from './light-paths.mjs';
-import { hazeVertex, hazeFragment } from './haze.mjs';
+import { venueBlockers } from './light-paths.mjs';
+import {curtainBoxes} from './venue-layout.mjs';
+import {objectBlockers} from './occlusion.mjs';
+import {SurfaceLighting,surfaceVertex,surfaceFragment} from './surface-lighting.mjs';
+import {BeamShadows} from './beam-shadows.mjs';
+import {FogField,fogVertex,fogFragment} from './fog-field.mjs';
 import {postVertex,postFragment} from './post.mjs';
 
 // Render-only facade. All channel decoding / scenes remain in ASLS Fixture and Scene.
@@ -14,59 +18,52 @@ export class TeachingLight {
   set shutterStrobe(v){this.shutter=v?.type==='Closed'?0:1;}
   dispose(){this.fixture=null;}
 }
-const BATCH=32;
-const vertex=`varying vec3 wp; varying vec3 wn; void main(){vec4 p=modelMatrix*vec4(position,1.);wp=p.xyz;wn=normalize(mat3(modelMatrix)*normal);gl_Position=projectionMatrix*viewMatrix*p;}`;
-const fragment=`precision highp float;
-uniform vec3 base;uniform float ambient;uniform int count;uniform vec4 lp[${BATCH}];uniform vec4 ld[${BATCH}];uniform vec3 lc[${BATCH}];varying vec3 wp;varying vec3 wn;
-${visibilityGLSL}
-void main(){
-  vec3 sum=vec3(ambient);
-  for(int i=0;i<${BATCH};i++){
-    if(i>=count)break;
-    vec3 dv=wp-lp[i].xyz;float dist=length(dv);vec3 dir=dv/max(.001,dist);
-    float cone=spotWeight(dot(dir,ld[i].xyz),ld[i].w);
-    if(cone<=.0001||lightBlocked(lp[i].xyz,wp))continue;
-    vec3 normal=gl_FrontFacing?normalize(wn):-normalize(wn);
-    float diffuse=max(0.,dot(normal,-dir));
-    sum+=lc[i]*lp[i].w*cone*diffuse*70./(28.+dist*dist);
-  }
-  gl_FragColor=vec4(base*sum,1.);
-}`;
 const vec=(o)=>new THREE.Vector3(o.x,o.y,o.z);
 function disposeTree(root){root.traverse(o=>{if(o.isInstancedMesh)o.dispose();o.geometry?.dispose();if(o.material){for(const m of Array.isArray(o.material)?o.material:[o.material]){m.map?.dispose();m.dispose();}}});root.clear();}
 export class StageRenderer {
   constructor(host,onSelect,onInvalidate=()=>{}){
     this.onInvalidate=onInvalidate;
     this.host=host;this.onSelect=onSelect;this.decor=new THREE.Scene();this.lit=new THREE.Scene();this.beamsScene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(43,1,.1,220);this.camera.up.set(0,0,1);
-    this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});this.renderer.setClearColor(new THREE.Color(.0028,.0045,.006));this.renderer.outputColorSpace=THREE.LinearSRGBColorSpace;this.renderer.autoClear=false;host.appendChild(this.renderer.domElement);
-    this.target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,depthTexture:new THREE.DepthTexture(1,1,THREE.UnsignedIntType)});
+    this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setClearColor(new THREE.Color(.0028,.0045,.006));this.renderer.outputColorSpace=THREE.LinearSRGBColorSpace;this.renderer.autoClear=false;host.appendChild(this.renderer.domElement);
+    this.target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:2,depthTexture:new THREE.DepthTexture(1,1,THREE.UnsignedIntType)});
     this.hazeTarget=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,depthBuffer:false});
     this.postScene=new THREE.Scene();this.postCamera=new THREE.Camera();
     this.postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.ShaderMaterial({depthTest:false,depthWrite:false,uniforms:{image:{value:this.target.texture},haze:{value:this.hazeTarget.texture},sceneDepth:{value:this.target.depthTexture},hazeSize:{value:new THREE.Vector2(1,1)},useHaze:{value:0}},vertexShader:postVertex,fragmentShader:postFragment})));
-    this.controls=new OrbitControls(this.camera,this.renderer.domElement);this.controls.enableDamping=false;this.controls.addEventListener('change',this.onInvalidate);this.controls.minDistance=6;this.controls.maxDistance=85;this.controls.maxPolarAngle=Math.PI*.49;this.controls.target.set(0,6,2);
+    this.controls=new OrbitControls(this.camera,this.renderer.domElement);this.controls.enableDamping=false;this.controls.addEventListener('change',this.onInvalidate);this.stopOrbitOnInput=()=>this.setOrbit(false);this.controls.addEventListener('start',this.stopOrbitOnInput);this.controls.minDistance=6;this.controls.maxDistance=85;this.controls.maxPolarAngle=Math.PI*.49;this.controls.target.set(0,6,2);
     this.materials=[];this.fixtures=[];this.meshes=[];this.capacity=0;this.selected=new Set();this.ray=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.stats={fps:0,fixtures:0,capacity:0,drawCalls:0,geometries:0};this.frames=0;this.lastStats=performance.now();this.quality='auto';this.stats.renderedFrames=0;this.resize=new ResizeObserver(()=>this.resizeView());this.resize.observe(host);
     this.down=e=>{this.pointerDown={x:e.clientX,y:e.clientY};};this.up=e=>{if(!this.pointerDown||Math.hypot(e.clientX-this.pointerDown.x,e.clientY-this.pointerDown.y)>6)return;const r=this.renderer.domElement.getBoundingClientRect();this.pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);this.ray.setFromCamera(this.pointer,this.camera);const hit=this.ray.intersectObjects(this.meshes)[0];if(hit)this.onSelect(hit.object.userData.ids[hit.instanceId],e.shiftKey||e.ctrlKey);};this.renderer.domElement.addEventListener('pointerdown',this.down);this.renderer.domElement.addEventListener('pointerup',this.up);this.view('audience');this.resizeView();
   }
   get showData(){return this.preferences||{};}
   resizeView(notify=true){
     const w=this.host.clientWidth,h=this.host.clientHeight;if(!w||!h)return;
-    const limit=this.quality==='high'?1600:this.quality==='low'?600:900;
-    const base=this.quality==='high'?Math.min(devicePixelRatio,1.5):1;
-    const ratio=Math.min(base,limit/Math.max(w,h))*(this.quality==='auto'&&this.interactive ? .45 : 1);
+    const ratio=Math.min(devicePixelRatio||1,this.quality==='high'?2:1.5);
     this.renderer.setPixelRatio(ratio);this.renderer.setSize(w,h);
     this.target.setSize(Math.round(w*ratio),Math.round(h*ratio));
-    const scale=this.quality==='high'?.65:.35;
+    const scale=Math.min(this.quality==='high'?.85:.65,(this.quality==='high'?1100:800)/Math.max(this.target.width,this.target.height));
     this.hazeTarget.setSize(Math.max(1,Math.round(this.target.width*scale)),Math.max(1,Math.round(this.target.height*scale)));
     this.postScene.children[0].material.uniforms.hazeSize.value.set(this.hazeTarget.width,this.hazeTarget.height);
-    if(this.beams){this.beams.material.uniforms.resolution.value.set(this.hazeTarget.width,this.hazeTarget.height);this.beams.material.uniforms.sampleCount.value=this.quality==='high'?12:8;}
+    if(this.beams){this.beams.material.uniforms.resolution.value.set(this.hazeTarget.width,this.hazeTarget.height);this.beams.material.uniforms.sampleCount.value=this.quality==='high'?56:40;}
     const changed=Math.abs(this.camera.aspect-w/h)>.04;this.camera.aspect=w/h;this.camera.updateProjectionMatrix();
     if(changed)this.view(this.lastView||'audience');if(notify)this.onInvalidate();
   }
-  setInteractive(active){if(this.interactive===active)return;this.interactive=active;if(this.quality==='auto')this.resizeView(false);}
+  setInteractive(){this.interactive=false;}
   setQuality(q){if(q===this.quality)return;this.quality=q;this.resizeView();}
-  view(name){const w=this.stage?.width||16,d=this.stage?.depth||15,h=this.stage?.height||8;const views={audience:[w*1.35,-d*1.5,h*2.3],front:[0,-d*1.55,h*.85],top:[0,d/2,Math.max(w,d)*2.15],left:[w*2.1,d/2,h*1.3],right:[-w*2.1,d/2,h*1.3]};this.lastView=name;this.controls.target.set(0,d*.46,2);this.camera.position.set(...(views[name]||views.audience));this.camera.position.sub(this.controls.target).multiplyScalar(Math.max(1,1.05/this.camera.aspect)).add(this.controls.target);this.controls.update();}
-  litMaterial(color){const m=new THREE.ShaderMaterial({uniforms:{...this.blockerUniforms,base:{value:new THREE.Color(color)},ambient:{value:.055},count:{value:0},lp:{value:Array.from({length:BATCH},()=>new THREE.Vector4())},ld:{value:Array.from({length:BATCH},()=>new THREE.Vector4())},lc:{value:Array.from({length:BATCH},()=>new THREE.Color())}},vertexShader:vertex,fragmentShader:fragment,side:THREE.DoubleSide});this.materials.push(m);return m;}
-  box(parent,size,position,color,lit=false){const m=new THREE.Mesh(new THREE.BoxGeometry(...size),lit?this.litMaterial(color):new THREE.MeshBasicMaterial({color}));m.position.set(...position);parent.add(m);return m;}
+  view(name){this.setOrbit(false);const w=this.stage?.width||16,d=this.stage?.depth||15,h=this.stage?.height||8;const views={audience:[w*1.35,-d*1.5,h*2.3],front:[0,-d*1.55,h*.85],top:[0,d/2,Math.max(w,d)*2.15],left:[w*2.1,d/2,h*1.3],right:[-w*2.1,d/2,h*1.3]};this.lastView=name;this.controls.target.set(0,d*.46,2);this.camera.position.set(...(views[name]||views.audience));this.camera.position.sub(this.controls.target).multiplyScalar(Math.max(1,1.05/this.camera.aspect)).add(this.controls.target);this.controls.update();}
+  setOrbit(active){
+    if(active){this.view('front');this.orbitOffset=this.camera.position.clone().sub(this.controls.target);this.orbitAngle=0;this.orbitTime=null;}
+    this.autoOrbit=active;this.onOrbitChange?.(active);this.onInvalidate();return active;
+  }
+  advanceOrbit(now){
+    if(!this.autoOrbit)return;
+    const elapsed=this.orbitTime===null?0:Math.min(.2,Math.max(0,(now-this.orbitTime)/1000));this.orbitTime=now;
+    this.orbitAngle+=elapsed*.1;const radius=Math.hypot(this.orbitOffset.x,this.orbitOffset.y);
+    this.camera.position.set(this.controls.target.x+Math.sin(this.orbitAngle)*radius,this.controls.target.y-Math.cos(this.orbitAngle)*radius,this.controls.target.z+this.orbitOffset.z);this.controls.update();
+  }
+  litMaterial(color){const m=new THREE.ShaderMaterial({uniforms:{base:{value:new THREE.Color(color)}},vertexShader:surfaceVertex,fragmentShader:surfaceFragment,side:THREE.DoubleSide});this.materials.push(m);return m;}
+  box(parent,size,position,color,lit=false){
+    const segments=lit?size.map(v=>Math.min(140,Math.max(1,Math.ceil(v/.2)))):[1,1,1];
+    const m=new THREE.Mesh(new THREE.BoxGeometry(...size,...segments),lit?this.litMaterial(color):new THREE.MeshBasicMaterial({color}));m.position.set(...position);m.userData.owner=this.currentOwner||0;parent.add(m);return m;
+  }
   label(text,x,y,z,color='#8c968e',scale=2.5){const c=document.createElement('canvas');c.width=512;c.height=64;const ctx=c.getContext('2d');ctx.fillStyle=color;ctx.font='24px sans-serif';ctx.textAlign='center';ctx.fillText(text,256,42);const tex=new THREE.CanvasTexture(c);const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));sprite.scale.set(scale,scale/8,1);sprite.position.set(x,y,z);this.decor.add(sprite);}
   mergeStatic(root){
     // Static geometry is rebuilt when the template or actor positions change.
@@ -79,7 +76,7 @@ export class StageRenderer {
     });
     for(const meshes of groups.values()){
       const material=meshes[0].material;retained.add(material);
-      const geometries=meshes.map(m=>m.geometry.clone().applyMatrix4(m.matrixWorld));
+      const geometries=meshes.map(m=>{m.geometry.setAttribute('owner',new THREE.BufferAttribute(new Float32Array(m.geometry.attributes.position.count).fill(m.userData.owner||0),1));return m.geometry.clone().applyMatrix4(m.matrixWorld);});
       const geometry=mergeGeometries(geometries);geometries.forEach(g=>g.dispose());
       for(const mesh of meshes){mesh.parent.remove(mesh);mesh.geometry.dispose();removed.add(mesh.material);}
       root.add(new THREE.Mesh(geometry,material));
@@ -87,11 +84,11 @@ export class StageRenderer {
     for(const material of removed)if(!retained.has(material))material.dispose();
     this.materials=this.materials.filter(m=>!removed.has(m)||retained.has(m));
   }
-  build(stage,objects,fixtures){
+  build(stage,objects,fixtures,curtains=[]){
     disposeTree(this.decor);disposeTree(this.lit);disposeTree(this.beamsScene);this.materials=[];this.meshes=[];this.stage=stage;this.fixtures=fixtures;this.capacity=nextCapacity(fixtures.length);const {width:w,depth:d,height:h}=stage;
-    this.blockers=venueBlockers(stage);
-    this.blockerUniforms={blockerCount:{value:this.blockers.length},blockerMin:{value:Array.from({length:MAX_BLOCKERS},(_,i)=>new THREE.Vector3(...(this.blockers[i]?.min||[0,0,0])))},blockerMax:{value:Array.from({length:MAX_BLOCKERS},(_,i)=>new THREE.Vector3(...(this.blockers[i]?.max||[0,0,0])))}};
-    for(const b of this.blockers)this.box(b.lit?this.lit:this.decor,b.size,b.center,b.color,b.lit);
+    this.fogField?.dispose();this.fogField=new FogField(stage);this.shadows?.dispose();this.shadows=new BeamShadows(this.capacity);this.surfaceLighting=new SurfaceLighting();this.blockerRevision=(this.blockerRevision||0)+1;this.stageBlockers=[...venueBlockers(stage),...curtainBoxes(stage,curtains)];this.blockers=[...this.stageBlockers,...objectBlockers(objects)];
+    this.blockerUniforms={blockerCount:{value:this.blockers.length}};
+    for(const b of this.stageBlockers)this.box(b.lit?this.lit:this.decor,b.size,b.center,b.color,b.lit);
     this.box(this.decor,[w+.3,d+.3,.3],[0,d/2,-.35],'#151c1c');
     for(let i=0;i<25;i++)this.box(this.lit,[w/25*.85,.14,h*.84],[-w/2+(i+.5)*w/25,d+.08,h*.42],'#283235',true);
     for(const y of stage.rows){this.box(this.decor,[w+1,.12,.12],[0,y,h+.25],'#465051');for(const x of [-w/2,w/2])this.box(this.decor,[.06,.06,1.1],[x,y,h+.8],'#374044');}
@@ -113,25 +110,27 @@ export class StageRenderer {
     this.lenses=new THREE.InstancedMesh(new THREE.SphereGeometry(.105,8,6),new THREE.MeshBasicMaterial({color:'#ffffff'}),this.capacity);this.lenses.frustumCulled=false;this.decor.add(this.lenses);
     const coneGeo=new THREE.ConeGeometry(1,1,32,1,false);coneGeo.translate(0,-.5,0);coneGeo.rotateX(-Math.PI/2);
     coneGeo.setAttribute('beamCos',new THREE.InstancedBufferAttribute(new Float32Array(this.capacity),1));
-    const haze=new THREE.ShaderMaterial({transparent:true,blending:THREE.AdditiveBlending,depthTest:false,depthWrite:false,side:THREE.BackSide,vertexShader:hazeVertex,fragmentShader:hazeFragment,uniforms:{...this.blockerUniforms,sampleCount:{value:this.quality==='high'?12:8},sceneDepth:{value:this.target.depthTexture},resolution:{value:new THREE.Vector2(this.hazeTarget.width,this.hazeTarget.height)},inverseProjection:{value:this.camera.projectionMatrixInverse},cameraWorld:{value:this.camera.matrixWorld}}});
-    this.beams=new THREE.InstancedMesh(coneGeo,haze,this.capacity);this.beams.frustumCulled=false;this.beamsScene.add(this.beams);
+    for(const [name,count] of [['beamRight',3],['beamUp',3],['shadowRect',4]])coneGeo.setAttribute(name,new THREE.InstancedBufferAttribute(new Float32Array(this.capacity*count),count));
+    const haze=new THREE.ShaderMaterial({transparent:true,depthTest:false,depthWrite:false,vertexShader:fogVertex,fragmentShader:fogFragment,uniforms:{field:{value:this.fogField.texture},fieldMin:{value:this.fogField.min},fieldSize:{value:this.fogField.size},sampleCount:{value:this.quality==='high'?56:40},sceneDepth:{value:this.target.depthTexture},resolution:{value:new THREE.Vector2(this.hazeTarget.width,this.hazeTarget.height)},inverseProjection:{value:this.camera.projectionMatrixInverse},cameraWorld:{value:this.camera.matrixWorld}}});
+    this.beams=new THREE.InstancedMesh(coneGeo,haze,this.capacity);this.beams.frustumCulled=false;
+    const fogQuad=new THREE.Mesh(new THREE.PlaneGeometry(2,2),haze);fogQuad.frustumCulled=false;this.beamsScene.add(fogQuad);
     this.stats.fixtures=fixtures.length;this.stats.capacity=this.capacity;
   }
   buildObjects(objects){
     if(!this.objectRoot)return;
     // Remove object materials from shared update list before disposal.
     const old=new Set();this.objectRoot.traverse(o=>{if(o.material)old.add(o.material);});this.materials=this.materials.filter(m=>!old.has(m));disposeTree(this.objectRoot);
-    for(const o of objects){const g=new THREE.Group();g.position.set(o.x,o.y,0);g.rotation.z=THREE.MathUtils.degToRad(o.rotation);g.userData.objectId=o.id;this.objectRoot.add(g);
+    for(const [objectIndex,o] of objects.entries()){this.currentOwner=objectIndex+1;const g=new THREE.Group();g.position.set(o.x,o.y,0);g.rotation.z=THREE.MathUtils.degToRad(o.rotation);g.userData.objectId=o.id;this.objectRoot.add(g);
       if(o.kind==='actor'){
-        const mat=this.litMaterial('#c3b9a9');const head=new THREE.Mesh(new THREE.SphereGeometry(.17,12,10),mat);head.position.z=1.65;g.add(head);
-        const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.21,.45,4,8),mat);torso.rotation.x=Math.PI/2;torso.position.z=1.13;g.add(torso);
+        const mat=this.litMaterial('#c3b9a9');const head=new THREE.Mesh(new THREE.SphereGeometry(.17,12,10),mat);head.userData.owner=this.currentOwner;head.position.z=1.65;g.add(head);
+        const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.21,.45,4,8),mat);torso.userData.owner=this.currentOwner;torso.rotation.x=Math.PI/2;torso.position.z=1.13;g.add(torso);
         for(const sign of [-1,1]){this.box(g,[.13,.17,.7],[sign*.13,0,.4],'#82908f',true);const arm=this.box(g,[.105,.14,.6],[sign*.31,0,1.06],'#c3b9a9',true);arm.rotation.y=sign*.13;}
         this.box(g,[.1,.1,.06],[0,-.16,1.65],'#d9cbb6',true);
       }else if(o.kind==='table'){this.box(g,[1.6,.8,.1],[0,0,.8],'#b4a48e',true);for(const x of [-.65,.65])for(const y of [-.3,.3])this.box(g,[.08,.08,.75],[x,y,.375],'#7d807a',true);
       }else if(o.kind==='chair'){this.box(g,[.5,.5,.08],[0,0,.45],'#aa9b85',true);this.box(g,[.5,.06,.55],[0,.23,.73],'#aa9b85',true);for(const x of [-.2,.2])for(const y of [-.2,.2])this.box(g,[.05,.05,.45],[x,y,.225],'#7d807a',true);
       }else this.box(g,[1.4,1.2,.5],[0,0,.25],'#9caba7',true);
     }
-    this.mergeStatic(this.objectRoot);this.onInvalidate();
+    this.currentOwner=0;this.mergeStatic(this.objectRoot);this.blockers=[...this.stageBlockers,...objectBlockers(objects)];this.blockerUniforms.blockerCount.value=this.blockers.length;this.blockerRevision++;this.onInvalidate();
   }
   update(fixtures,settings,selected,solo){
     this.fixtures=fixtures;this.selected=new Set(selected);this.lightData=[];const dummy=new THREE.Object3D(),lens=new THREE.Object3D();const groups=Object.fromEntries(this.meshes.map(m=>[m.userData.kind,m]));for(const m of this.meshes)m.userData.ids=[];
@@ -139,7 +138,7 @@ export class StageRenderer {
       if(meta.kind==='moving'){const up=new THREE.Vector3(0,0,1),axis=new THREE.Vector3().crossVectors(dir,up);if(axis.lengthSq()<.0001)axis.set(1,0,0);axis.normalize();dir.applyAxisAngle(axis,THREE.MathUtils.degToRad(model.tilt||0));dir.applyAxisAngle(up,THREE.MathUtils.degToRad(model.pan||0)).normalize();}
       const intensity=effectiveIntensity(model.intensity*(model.strobeEffect==='Closed'?0:model.shutter??1),meta.broken,settings,!solo||!selected.length||this.selected.has(f.id));
       const color=new THREE.Color(meta.baseColor);if(['rgb','moving'].includes(meta.kind)){color.setRGB(...model.rgb.map(c=>c+(model.white||0)));if(model.colorPreset)color.set(Array.isArray(model.colorPreset)?model.colorPreset[0]:model.colorPreset);}
-      const angle=Math.max(5,Math.min(120,Number.isFinite(model.zoom)&&model.zoom>0?model.zoom:meta.angle));this.lightData.push({pos,dir,intensity,color,angle});
+      const angle=Math.max(5,Math.min(120,Number.isFinite(model.zoom)&&model.zoom>0?model.zoom:meta.angle));this.lightData.push({id:f.id,pos,dir,intensity,color,angle});
       const mesh=groups[meta.kind]||groups.spot,j=mesh.userData.ids.length;mesh.userData.ids.push(f.id);dummy.position.copy(pos);dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),dir);dummy.scale.set(1,1,1);dummy.updateMatrix();mesh.setMatrixAt(j,dummy.matrix);mesh.setColorAt(j,new THREE.Color(this.selected.has(f.id)?'#f1cb80':meta.broken?'#b44f50':'#596970'));
       lens.position.copy(pos).addScaledVector(dir,.24);lens.updateMatrix();this.lenses.setMatrixAt(i,lens.matrix);this.lenses.setColorAt(i,meta.broken&&!settings.repair?new THREE.Color('#ef6266'):intensity?color.clone().multiplyScalar(.5+intensity*2):new THREE.Color('#4c5b5d'));
       if(intensity>.0001){
@@ -153,16 +152,18 @@ export class StageRenderer {
       }
       i++;
     }
+    const blockers=this.blockers.slice(0,this.blockerUniforms.blockerCount.value),revision=this.blockerRevision+':'+this.blockerUniforms.blockerCount.value;
+    this.activeBlockers=blockers;this.activeRevision=revision;
+    if(settings.fog)this.fogField.update(this.lightData,blockers,revision,this.shadows);
     for(const m of this.meshes){m.count=m.userData.ids.length;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;}
     for(const m of [this.lenses,this.beams]){m.count=m===this.beams?beamCount:i;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;}
-    this.beams.geometry.attributes.beamCos.needsUpdate=true;
-    this.beams.visible=!!settings.fog&&settings.quality!=='low';
+    for(const name of ['beamCos','beamRight','beamUp','shadowRect'])this.beams.geometry.attributes[name].needsUpdate=true;
+    this.beams.visible=!!settings.fog;
   }
   render(){
     this.controls.update();const r=this.renderer;r.info.autoReset=false;r.info.reset();r.setRenderTarget(this.target);r.clear();
-    for(const m of this.materials){m.uniforms.ambient.value=.045;m.uniforms.count.value=0;m.blending=THREE.NoBlending;m.depthWrite=true;}
-    r.render(this.lit,this.camera);const lights=this.lightData?.filter(l=>l.intensity>.0001)||[];
-    for(let start=0;start<lights.length;start+=BATCH){const batch=lights.slice(start,start+BATCH);for(const m of this.materials){m.blending=THREE.AdditiveBlending;m.depthWrite=false;m.uniforms.ambient.value=0;m.uniforms.count.value=batch.length;batch.forEach((l,i)=>{m.uniforms.lp.value[i].set(l.pos.x,l.pos.y,l.pos.z,l.intensity);m.uniforms.ld.value[i].set(l.dir.x,l.dir.y,l.dir.z,Math.cos(l.angle*Math.PI/360));m.uniforms.lc.value[i].copy(l.color);});}r.render(this.lit,this.camera);}
+    this.surfaceLighting.update(this.lit,this.lightData||[],this.activeBlockers||this.blockers,this.activeRevision||this.blockerRevision);
+    r.render(this.lit,this.camera);
     r.render(this.decor,this.camera);
     const fog=this.beams.visible&&this.beams.count>0;
     if(fog){
@@ -175,5 +176,5 @@ export class StageRenderer {
     this.stats.drawCalls=r.info.render.calls;this.stats.geometries=r.info.memory.geometries;
     this.frames++;const now=performance.now();if(now-this.lastStats>1000){this.stats.fps=Math.round(this.frames*1000/(now-this.lastStats));this.stats.drawCalls=r.info.render.calls;this.stats.geometries=r.info.memory.geometries;this.frames=0;this.lastStats=now;}
   }
-  dispose(){this.resize.disconnect();this.controls.removeEventListener('change',this.onInvalidate);this.controls.dispose();disposeTree(this.decor);disposeTree(this.lit);disposeTree(this.beamsScene);disposeTree(this.postScene);this.target.dispose();this.hazeTarget.dispose();this.renderer.domElement.removeEventListener('pointerdown',this.down);this.renderer.domElement.removeEventListener('pointerup',this.up);this.renderer.dispose();this.renderer.domElement.remove();}
+  dispose(){this.resize.disconnect();this.controls.removeEventListener('change',this.onInvalidate);this.controls.removeEventListener('start',this.stopOrbitOnInput);this.controls.dispose();disposeTree(this.decor);disposeTree(this.lit);disposeTree(this.beamsScene);disposeTree(this.postScene);this.target.dispose();this.hazeTarget.dispose();this.shadows?.dispose();this.fogField?.dispose();this.beams?.geometry.dispose();this.renderer.domElement.removeEventListener('pointerdown',this.down);this.renderer.domElement.removeEventListener('pointerup',this.up);this.renderer.dispose();this.renderer.domElement.remove();}
 }

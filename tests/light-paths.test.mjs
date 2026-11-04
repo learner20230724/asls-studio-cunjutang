@@ -9,7 +9,7 @@ test('every working front light has an unobstructed path through the stage mouth
     assert.equal(segmentBlocked([p.x,p.y,p.z],[t.x,t.y,t.z],walls),false,light.name);
     // At floor height, the same optical axis must still reach the actual stage.
     const scale=(-.01-p.z)/(t.z-p.z),floor=[p.x+(t.x-p.x)*scale,p.y+(t.y-p.y)*scale,-.01];
-    assert.ok(Math.abs(floor[0])<8&&floor[1]>0&&floor[1]<15);
+    assert.ok(Math.abs(floor[0])<DEFAULT_STAGE.width/2&&floor[1]>0&&floor[1]<15);
     assert.equal(segmentBlocked([p.x,p.y,p.z],floor,walls),false,light.name);
   }
 });
@@ -18,7 +18,7 @@ test('wall, floor and wing stop light behind them, not on their receiving surfac
   assert.equal(segmentBlocked([0,8,3],[0,15.125,3],walls),false);
   assert.equal(segmentBlocked([0,4,8],[0,4,-1],walls),true);
   assert.equal(segmentBlocked([0,4,8],[0,4,-.01],walls),false);
-  assert.equal(segmentBlocked([6,0,2],[9,2,2],walls),true);
+  assert.equal(segmentBlocked([DEFAULT_STAGE.width/2-2,0,2],[DEFAULT_STAGE.width/2+1,2,2],walls),true);
   assert.equal(segmentBlocked([0,8,9],[0,16,9],walls),false);
 });
 test('parallel, reverse, inside-wall and short rays are handled',()=>{

@@ -43,6 +43,14 @@ async (page) => {
       r.blockerUniforms.blockerCount.value=0;render();const receiverUnblocked=sample([0,18,.01],r.target);
       assert('wall also prevents direct illumination on a receiver behind it',receiverUnblocked>receiverBlocked+.03,{receiverBlocked,receiverUnblocked});
       r.blockerUniforms.blockerCount.value=r.blockers.length;settings.fog=true;
+      settings.fog=false;f.position={x:0,y:0,z:1};f.training.target={x:0,y:8,z:0};
+      camera([10,-14,13],[0,8,0]);render();const clearFloor=sample([0,8,.01],r.target);
+      r.buildObjects([{id:'shadow-block',kind:'block',x:0,y:4,rotation:0}]);render();const shadowFloor=sample([0,8,.01],r.target);
+      assert('stage props cast an actual floor shadow',clearFloor>shadowFloor*2&&clearFloor>shadowFloor+.01,{clearFloor,shadowFloor});
+      r.buildObjects([{id:'shadow-block',kind:'block',x:4,y:4,rotation:0}]);render();const movedFloor=sample([0,8,.01],r.target);
+      assert('moving the prop moves its shadow',movedFloor>shadowFloor*2&&Math.abs(movedFloor-clearFloor)<.002,{movedFloor,shadowFloor});
+      const bakes=r.surfaceLighting.computations;camera([9,-13,12],[0,8,0]);render();
+      assert('camera movement reuses lighting at unchanged resolution',r.surfaceLighting.computations===bakes&&r.renderer.domElement.width>=r.host.clientWidth,{bakes:r.surfaceLighting.computations});
       settings.blackout=true;render();assert('blackout removes haze instances',r.beams.count===0,r.beams.count);
       settings.blackout=false;f.training.broken=true;render();assert('broken fixture cannot emit haze',r.beams.count===0,r.beams.count);
       settings.repair=true;render();assert('repair comparison restores emission',r.beams.count===1,r.beams.count);
