@@ -9,7 +9,6 @@ export function venueBlockers({width:w,depth:d,height:h}) {
   box('back-wall',[w+.4,.25,h],[0,d+.25,h/2],'#252e30');
   for(const sign of [-1,1]) {
     box(`side-base-${sign}`,[.3,d,.7],[sign*(w/2+.55),d/2,.35],'#1b2326',false);
-    for(let i=0;i<4;i++)box(`wing-${sign}-${i}`,[.6,.16,h*.85],[sign*(w/2-.35),1+i*d/4,h*.425],'#1c2629');
   }
   return boxes;
 }

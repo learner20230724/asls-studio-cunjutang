@@ -34256,7 +34256,19 @@
       {
         "id": "second",
         "name": "二道幕",
-        "y": 7.5,
+        "y": 4.75,
+        "closed": false
+      },
+      {
+        "id": "third",
+        "name": "三道幕",
+        "y": 8.5,
+        "closed": false
+      },
+      {
+        "id": "fourth",
+        "name": "四道幕",
+        "y": 12.25,
         "closed": false
       }
     ],
@@ -34307,6 +34319,7 @@
       "20:2": 3,
       "20:3": 2
     },
+    "cueStages": {},
     "currentChannels": {},
     "note": "左耳光镜像、尺寸、灯高、朝向、灯具型号及能力为教学估算，可修改；不代表实测。"
   }

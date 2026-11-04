@@ -4,8 +4,8 @@ import {createTemplate,normalizeShow} from '../src/training/rig.mjs';
 import {migrateVenue,curtainBoxes} from '../src/training/venue-layout.mjs';
 import {blockedSegment,objectBlockers,rayHit} from '../src/training/occlusion.mjs';
 
-test('21m venue and two independently openable curtains',()=>{
- const show=createTemplate();assert.equal(show.training.stage.width,21);assert.equal(show.training.curtains.length,2);
+test('21m venue and four independently openable curtains',()=>{
+ const show=createTemplate();assert.equal(show.training.stage.width,21);assert.equal(show.training.curtains.length,4);
  const [first,second]=show.training.curtains;assert.equal(blockedSegment(0,-4,4,0,5,1,curtainBoxes(show.training.stage,show.training.curtains)),false);
  first.closed=true;assert.equal(blockedSegment(0,-4,4,0,5,1,curtainBoxes(show.training.stage,show.training.curtains)),true);
  first.closed=false;second.closed=true;assert.equal(blockedSegment(0,3,4,0,12,1,curtainBoxes(show.training.stage,show.training.curtains)),true);

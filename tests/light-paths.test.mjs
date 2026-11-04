@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {venueBlockers,segmentBlocked,MAX_BLOCKERS} from '../src/training/light-paths.mjs';
 import {buildRig,DEFAULT_STAGE,createTemplate,normalizeShow} from '../src/training/rig.mjs';
-const walls=venueBlockers(DEFAULT_STAGE);
+import {curtainBoxes,defaultCurtains} from '../src/training/venue-layout.mjs';
+const walls=[...venueBlockers(DEFAULT_STAGE),...curtainBoxes(DEFAULT_STAGE,defaultCurtains(DEFAULT_STAGE))];
 test('every working front light has an unobstructed path through the stage mouth',()=>{
   for(const light of buildRig().filter(f=>f.training.zone==='front')){
     const {position:p,training:{target:t}}=light;
@@ -18,7 +19,7 @@ test('wall, floor and wing stop light behind them, not on their receiving surfac
   assert.equal(segmentBlocked([0,8,3],[0,15.125,3],walls),false);
   assert.equal(segmentBlocked([0,4,8],[0,4,-1],walls),true);
   assert.equal(segmentBlocked([0,4,8],[0,4,-.01],walls),false);
-  assert.equal(segmentBlocked([DEFAULT_STAGE.width/2-2,0,2],[DEFAULT_STAGE.width/2+1,2,2],walls),true);
+  assert.equal(segmentBlocked([DEFAULT_STAGE.width/2-.3,0,2],[DEFAULT_STAGE.width/2-.3,2,2],walls),true);
   assert.equal(segmentBlocked([0,8,9],[0,16,9],walls),false);
 });
 test('parallel, reverse, inside-wall and short rays are handled',()=>{
