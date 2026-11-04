@@ -25,6 +25,22 @@ test('ablation: object motion and curtain motion act independently and combine',
  const onlyObjects=interpolateStage(from,{objects:target.objects,curtains:from.curtains},.5),onlyCurtains=interpolateStage(from,{objects:from.objects,curtains:target.curtains},.5),combined=interpolateStage(from,target,.5);
  assert.equal(onlyObjects.objects[0].x,combined.objects[0].x);assert.equal(onlyObjects.curtains[0].amount,0);assert.deepEqual(onlyCurtains.objects,from.objects);assert.equal(onlyCurtains.curtains[0].amount,combined.curtains[0].amount);
 });
-test('demonstration has seven varied scenes, starts and ends closed, preserves input',()=>{
- const d=createTemplate(),before=structuredClone(d),plan=demoPlan(d.training.stage,d.training.objects);assert.equal(plan.length,7);assert.ok(plan[0].stage.curtains.every(c=>c.closed));assert.ok(plan.at(-1).stage.curtains.every(c=>c.closed));assert.ok(plan[3].stage.curtains.every(c=>!c.closed));assert.notEqual(plan[2].stage.objects[0].x,plan[4].stage.objects[0].x);for(const p of plan)validateStageState(p.stage,d.training.stage);assert.deepEqual(d,before);
+test('demonstration has twelve varied scenes, starts and ends closed, preserves input',()=>{
+ const d=createTemplate(),before=structuredClone(d),plan=demoPlan(d.training.stage,d.training.objects);assert.equal(plan.length,12);assert.ok(plan[0].stage.curtains.every(c=>c.closed));assert.ok(plan.at(-1).stage.curtains.every(c=>c.closed));assert.ok(plan[3].stage.curtains.every(c=>!c.closed));assert.notEqual(plan[2].stage.objects[0].x,plan[4].stage.objects[0].x);for(const p of plan)validateStageState(p.stage,d.training.stage);assert.deepEqual(d,before);
+});
+
+test('authored moving-head rotation interpolates continuously and survives save/import',()=>{
+ const d=createTemplate(),a=captureStage(d.training),b=structuredClone(a);a.aims={7:{pan:140,tilt:14}};b.aims={7:{pan:210,tilt:4}};
+ const mid=interpolateStage(a,b,.5);assert.deepEqual(mid.aims[7],{pan:175,tilt:9});d.training.aims=mid.aims;d.training.cueStages['20:0']=captureStage(d.training);assert.deepEqual(normalizeShow(d).training.cueStages['20:0'].aims,mid.aims);
+ d.training.aims[7].pan=Infinity;assert.throws(()=>normalizeShow(d));
+});
+test('new demo has paired moving-head colors, full rotation and five reusable props',async()=>{
+ const {demoChannels}=await import('../src/training/demo.mjs'),d=createTemplate(),plan=demoPlan(d.training.stage,d.training.objects);
+ assert.equal(plan[0].stage.objects.filter(o=>o.demoProp).length,5);assert.equal(new Set(plan[0].stage.objects.map(o=>o.id)).size,7);
+ const moving=d.fixtures.filter(f=>f.training.kind==='moving'&&f.training.number%2===0);assert.equal(moving.length,8);
+ for(const step of plan.slice(3,10)){const values=moving.map(f=>demoChannels(f,step));assert.ok(values.every(v=>v.level>0));assert.ok(new Set(values.map(v=>v.rgb.join())).size>1);assert.ok(values.every(v=>v.pan>=0&&v.pan<=255&&v.tilt>=0&&v.tilt<=255));assert.equal(step.hold,step===plan[9]?1:0);}
+ assert.equal(demoChannels(moving[0],plan[9]).aim.pan-demoChannels(moving[0],plan[3]).aim.pan,360*Math.sign(moving[0].position.x));
+ const again=demoPlan(d.training.stage,plan[3].stage.objects);assert.equal(again[0].stage.objects.length,7);
+ const custom={id:'own-table',name:'用户桌子',kind:'table',x:7,y:8,rotation:10};for(const step of demoPlan(d.training.stage,[...d.training.objects,custom]))assert.deepEqual(step.stage.objects.find(o=>o.id===custom.id),custom);
+ const bad=createTemplate();bad.training.cueHolds={'20:0':-1};assert.throws(()=>normalizeShow(bad));
 });

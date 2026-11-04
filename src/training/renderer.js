@@ -174,7 +174,7 @@ export class StageRenderer {
   update(fixtures,settings,selected,solo){
     this.fixtures=fixtures;this.selected=new Set(selected);this.lightData=[];const dummy=new THREE.Object3D(),lens=new THREE.Object3D();const groups=Object.fromEntries(this.meshes.map(m=>[m.userData.kind,m]));for(const m of this.meshes)m.userData.ids=[];
     let i=0,beamCount=0;for(const f of fixtures){const meta=f.training,model=f._3DModel;const pos=vec(f.position),target=vec(meta.target);let dir=target.sub(pos).normalize();
-      if(meta.kind==='moving'){const up=new THREE.Vector3(0,0,1),axis=new THREE.Vector3().crossVectors(dir,up);if(axis.lengthSq()<.0001)axis.set(1,0,0);axis.normalize();dir.applyAxisAngle(axis,THREE.MathUtils.degToRad(model.tilt||0));dir.applyAxisAngle(up,THREE.MathUtils.degToRad(model.pan||0)).normalize();}
+      if(meta.kind==='moving'){const up=new THREE.Vector3(0,0,1),axis=new THREE.Vector3().crossVectors(dir,up);if(axis.lengthSq()<.0001)axis.set(1,0,0);axis.normalize();dir.applyAxisAngle(axis,THREE.MathUtils.degToRad(this.aims?.[f.id]?.tilt??model.tilt??0));dir.applyAxisAngle(up,THREE.MathUtils.degToRad(this.aims?.[f.id]?.pan??model.pan??0)).normalize();}
       const intensity=effectiveIntensity(model.intensity*(model.strobeEffect==='Closed'?0:model.shutter??1),meta.broken,settings,!solo||!selected.length||this.selected.has(f.id));
       const color=new THREE.Color(meta.baseColor);if(['rgb','moving'].includes(meta.kind)){color.setRGB(...model.rgb.map(c=>c+(model.white||0)));if(model.colorPreset)color.set(Array.isArray(model.colorPreset)?model.colorPreset[0]:model.colorPreset);}
       const angle=Math.max(5,Math.min(120,Number.isFinite(model.zoom)&&model.zoom>0?model.zoom:meta.angle));this.lightData.push({id:f.id,pos,dir,intensity,color,angle});

@@ -1,4 +1,4 @@
-import {validateStageState} from './scene-state.mjs';
+import {validateStageState,validateAims} from './scene-state.mjs';
 import {defaultCurtains,migrateVenue} from './venue-layout.mjs';
 // Parametric venue template. Z is up; +X is actor-left, +Y is upstage.
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -94,7 +94,7 @@ export function normalizeShow(raw){
   const defaults=createTemplate().training;
   if(d.training&&d.training.version!==1)throw new Error('不支持的工程版本 / Unsupported version');
   d.training={...defaults,...d.training,objects:d.training?.objects||[],settings:{...defaults.settings,...d.training?.settings},currentChannels:d.training?.currentChannels||{},cueTimes:d.training?.cueTimes||{}};
-  const s=d.training.stage;
+  const s=d.training.stage;validateAims(d.training.aims);
   if(savedCurtains===undefined)d.training.curtains=defaultCurtains(s);
   // Extend the earlier built-in pair without changing either saved curtain.
   if(d.training.curtains?.length===2&&d.training.curtains[0].id==='first'&&d.training.curtains[1].id==='second')d.training.curtains.push(...defaultCurtains(s).slice(2));
@@ -107,6 +107,8 @@ export function normalizeShow(raw){
   if(!Array.isArray(s.rows)||s.rows.length<1||s.rows.length>32||s.rows.some((v,i)=>!Number.isFinite(v)||v<0||v>s.depth||(i>0&&v<=s.rows[i-1])))throw new Error('灯排应有 1–32 排，距台口距离递增且位于舞台内 / Invalid row depths');
   if(!Array.isArray(d.training.objects)||d.training.objects.length>100)throw new Error('舞台对象过多 / Too many stage objects');
   const objectIds=new Set();for(const o of d.training.objects){if(!o.id||objectIds.has(o.id)||!['actor','table','chair','block'].includes(o.kind)||!Number.isFinite(o.x)||!Number.isFinite(o.y)||!Number.isFinite(o.rotation))throw new Error('舞台对象不合法 / Invalid stage object');objectIds.add(o.id);}
+  if(d.training.cueHolds!==undefined&&(!d.training.cueHolds||typeof d.training.cueHolds!=='object'||Array.isArray(d.training.cueHolds)))throw Error('场景停留时间格式不正确');
+  for(const v of Object.values(d.training.cueHolds||{}))if(!Number.isFinite(v)||v<0||v>120)throw Error('场景停留时间应为 0–120 秒');
   for(const v of Object.values(d.training.cueTimes))if(!Number.isFinite(v)||v<0||v>120)throw new Error('渐变时间应为 0–120 秒 / Invalid fade time');
   const settings=d.training.settings;
   if(settings.quality==='low')settings.quality='auto';
