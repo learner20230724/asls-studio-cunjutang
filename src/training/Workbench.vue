@@ -3,9 +3,9 @@ import {ref,reactive,computed,nextTick,onMounted,onBeforeUnmount,watch} from 'vu
 import {TrainingEngine} from './engine';
 import {StageRenderer} from './renderer';
 import {DemandLoop} from './demand-loop.mjs';
-import {createTemplate,clone,LABELS,TYPES,DEFAULT_STAGE} from './rig.mjs';
+import {clone,LABELS,TYPES,DEFAULT_STAGE} from './rig.mjs';
 import ColorPalette from './ColorPalette.vue';
-import {installDemo} from './demo.mjs';
+import {installDemo,createShowcaseTemplate} from './demo.mjs';
 import {translate} from './i18n.mjs';
 
 const lang=ref(localStorage.getItem('CJT_LANGUAGE')||'zh'),t=s=>translate(s,lang.value);
@@ -19,7 +19,7 @@ const orbiting=ref(false),tour=ref(-1);
 const tourSteps=[{title:'左侧 · 选择灯光',text:'按灯位分区选择灯组；选中即亮可以快速试灯，摇头灯有独立入口。',panel:'rig'},{title:'右侧 · 调整与布置',text:'在这里调亮度、颜色和方向。演员与道具可以在舞台上直接按住拖动。',panel:'controls'},{title:'上方 · 全局与幕布',text:'画质、灯光全开和全关在右上角；舞台上方的四道幕可以分别缓缓开合。',panel:'stage'},{title:'下方 · 保存与编排',text:'新增当前场景会一起记录灯光、站位和幕布。直接改名称，设置渐变时间，再按顺序播放。',panel:'cues'},{title:'准备好了 · 从开场到谢幕',text:'点击播放案例，观看启幕、双人对话、摇头灯交叉扫动、旋转变色和谢幕。案例会加入场景列表，之后可以继续修改。',panel:'stage'}];
 function guide(index=0){tour.value=index;mobile.value=tourSteps[index].panel;}
 function closeGuide(){tour.value=-1;localStorage.setItem('CJT_TOUR_V4','done');mobile.value='stage';}
-function playDemo(){closeGuide();engine.stop();const index=installDemo(engine);settings.blackout=false;settings.master=1;settings.fog=true;solo.value=false;renderer.setOrbit(false);renderer.view('front');engine.go(index,true);engine.play();engine.playEnd=index+engine.cues.filter(c=>c.group===engine.cues[index].group).length-1;changed();}
+function playDemo(){closeGuide();engine.stop();const index=installDemo(engine);settings.blackout=false;settings.master=1;solo.value=false;renderer.setOrbit(false);renderer.view('front');engine.go(index,true);engine.play();engine.playEnd=index+engine.cues.filter(c=>c.group===engine.cues[index].group).length-1;changed();}
 let internalPulse=false,lastUI=0;
 function refreshUI(){internalPulse=true;pulse.value++;internalPulse=false;}
 function invalidate(){loop?.invalidate();}
@@ -63,7 +63,13 @@ async function run(fn,rebuild=false){if(busy.value)return;busy.value=true;error.
 function save(){if(!engine.save(true))error.value=t('保存失败，请导出备份');refreshUI();}
 function download(template=false){const d=engine.snapshot();if(template){d.training.source=d.name;d.training.settings.blackout=false;}const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${d.name.replace(/[\\/:*?"<>|]/g,'-')}${template?'.template':''}.showfile.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);note('已导出');}
 async function importFile(e){const f=e.target.files?.[0];if(!f)return;await run(async()=>{if(f.size>15*1024*1024)throw new Error('文件超过 15 MB / File exceeds 15 MB');let data;try{data=JSON.parse(await f.text());}catch{throw new Error('工程文件不是有效的 JSON，请检查文件是否损坏 / Invalid JSON showfile');}await engine.load(data);engine.recoveryBlocked=false;note('工程已导入');},true);e.target.value='';}
-function reset(){if(!confirm(lang.value==='en'?'Replace this practice with the original template? Export a backup first.':'恢复原模板会替换当前练习，请先导出备份。确定恢复？'))return;run(async()=>{await engine.load(createTemplate());engine.go(0,true);selected.value=[];solo.value=false;note('已恢复默认模板');},true);}
+function reset(){run(async()=>{
+  const previous=JSON.stringify(engine.snapshot());
+  await engine.load(createShowcaseTemplate());
+  try{localStorage.setItem('CUNJUTANG_SHOW_V1.before-template-reset',previous);}catch{/* Reset still works when the old project has filled browser storage. */}
+  selected.value=[];solo.value=false;zone.value='all';search.value='';showFaults.value=false;objectId.value='';tab.value='lights';closeGuide();renderer.setOrbit(false);sync();renderer.view('front');
+  if(!engine.save(true))error.value=t('保存失败，请导出备份');
+});}
 function setLevel(e){engine.setLevel(selected.value,e.target.value);pulse.value++;}
 function setColor(e){engine.setColor(selected.value,e.target.value);pulse.value++;}
 function aimValue(key){pulse.value;return picked.value.find(f=>f.training.kind==='moving')?.quickChannelsAccessors[key]?.[0]?.value.DMX??128;}
@@ -161,7 +167,7 @@ onBeforeUnmount(()=>{loop?.dispose();clearTimeout(saveTimer);engine.onChange=nul
       </aside>
     </div>
     <section class="cue-panel" :class="{'tour-focus':tour===3}" :inert="!ready||busy">
-      <div class="cue-toolbar"><div><h2>{{t('场景编排')}} <span>{{cues.length.toString().padStart(2,'0')}}</span></h2></div><div class="cue-transport"><button @click="engine.go(Math.max(0,engine.active-1));pulse++" :aria-label="t('上一场')">⏮</button><button class="play-button" @click="engine.play();pulse++">▶ {{t('播放')}}</button><button @click="engine.stop();pulse++">■ {{t('停止')}}</button><button @click="engine.go(Math.min(cues.length-1,engine.active+1));pulse++" :aria-label="t('下一场')">⏭</button></div><button class="capture-button" @click="capture" :disabled="!ready||busy">＋ {{t('新增当前场景')}}</button></div>
+      <div class="cue-toolbar"><div><h2>{{t('场景编排')}} <span>{{cues.length.toString().padStart(2,'0')}}</span></h2></div><div class="cue-transport"><button @click="engine.go(Math.max(0,engine.active-1));pulse++" :aria-label="t('上一场')">⏮</button><button class="play-button" @click="engine.play();pulse++">▶ {{t('播放')}}</button><button @click="engine.stop();pulse++">■ {{t('停止')}}</button><button @click="engine.go(Math.min(cues.length-1,engine.active+1));pulse++" :aria-label="t('下一场')">⏭</button></div><div class="cue-edit-actions"><button class="reset-template-button" @click="reset" :disabled="!ready||busy">{{t('重置为模板场景')}}</button><button class="capture-button" @click="capture" :disabled="!ready||busy">＋ {{t('新增当前场景')}}</button></div></div>
       <div class="cue-list"><article v-for="(item,i) in cues" :key="item.key" class="cue-card" :class="{active:engine.active===i}"><div class="cue-top"><span class="cue-number">{{String(i+1).padStart(2,'0')}}</span><input :value="item.cue.name" @change="item.cue.name=$event.target.value;changed()" :aria-label="`${t('名称')} ${i+1}`"><span class="cue-indicator"></span></div><div class="cue-middle"><label>{{t('渐变')}} <input type="number" min="0" max="120" step=".5" :value="cueTimeValue(item)" :aria-label="`${t('渐变')} ${i+1}`" @change="cueTime(item,$event)"> {{t('秒')}}</label><button @click="engine.go(i);pulse++">{{t('调用')}} ↗</button></div><div class="cue-actions"><button @click="updateCue(i)">{{t('更新')}}</button><button @click="engine.moveCue(i,-1);changed()" :disabled="i===0||cues[i-1]?.group!==item.group" :aria-label="`${t('上移')} ${i+1}`">↑</button><button @click="engine.moveCue(i,1);changed()" :disabled="i===cues.length-1||cues[i+1]?.group!==item.group" :aria-label="`${t('下移')} ${i+1}`">↓</button><button @click="deleteCue(i)" :aria-label="`${t('删除')} ${i+1}`">×</button></div></article><div v-if="!cues.length" class="empty-cues">{{t('暂无灯光场景')}}</div></div>
 
     </section>

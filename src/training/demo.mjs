@@ -1,4 +1,4 @@
-import {blankGroup,clone} from './rig.mjs';
+import {blankGroup,clone,createTemplate} from './rig.mjs';
 import {defaultCurtains} from './venue-layout.mjs';
 export const DEMO_NAME='光影剧场 · 摇头灯与布景';
 export function demoPlan(stage,existing){
@@ -50,8 +50,23 @@ export function installDemo(engine){
  engine.training.cueHolds??={};
  for(const [id,step] of demoPlan(engine.training.stage,engine.training.objects).entries()){
   const raw=engine.capture(g,id,step.name);step.stage.aims={};
-  for(const fv of raw.fixtureValues){const f=fixtures.find(f=>f.id===fv.fixture.id),v=demoChannels(f,step);if(f.training.kind==='moving')step.stage.aims[f.id]=v.aim;for(const c of fv.channelValues)c.value=c.type==='Dimmer'?v.level:c.type==='Color'?v.rgb[['Red','Green','Blue'].indexOf(c.color)]??255:c.type==='Pan'?v.pan:c.type==='Tilt'?v.tilt:c.value;}
+  applyDemoChannels(raw,fixtures,step);
   g.addCue(raw);const key=`${g.id}:${id}`;engine.training.cueTimes[key]=step.seconds;engine.training.cueHolds[key]=step.hold;engine.training.cueStages??={};engine.training.cueStages[key]=step.stage;
  }
  engine.mark();return engine.cues.findIndex(c=>c.group===g);
+}
+
+function applyDemoChannels(raw,fixtures,step){
+ for(const fv of raw.fixtureValues){const f=fixtures.find(f=>f.id===fv.fixture.id),v=demoChannels(f,step);if(f.training.kind==='moving')step.stage.aims[f.id]=v.aim;for(const c of fv.channelValues)c.value=c.type==='Dimmer'?v.level:c.type==='Color'?v.rgb[['Red','Green','Blue'].indexOf(c.color)]??255:c.type==='Pan'?v.pan:c.type==='Tilt'?v.tilt:c.value;}
+}
+// A clean presentation project: warm, furnished preview; Play starts at cue 1.
+export function createShowcaseTemplate(){
+ const data=createTemplate(),group=data.groups.find(g=>g.id===20),preview=clone(group.cues[0]);
+ data.training.currentChannels=Object.fromEntries(preview.fixtureValues.map(fv=>[fv.fixture.id,fv.channelValues.map(c=>c.value)]));
+ group.name=DEMO_NAME;group.cues=[];data.training.cueTimes={};data.training.cueHolds={};data.training.cueStages={};
+ for(const [id,step] of demoPlan(data.training.stage,data.training.objects).entries()){
+  const raw={...clone(preview),id,name:step.name};step.stage.aims={};applyDemoChannels(raw,data.fixtures,step);group.cues.push(raw);
+  const key=`${group.id}:${id}`;data.training.cueTimes[key]=step.seconds;data.training.cueHolds[key]=step.hold;data.training.cueStages[key]=step.stage;
+ }
+ return data;
 }
