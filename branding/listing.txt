@@ -1,0 +1,6 @@
+小工具名称：光场灯光排练室
+简介：调灯布景，编排光影舞台
+
+图标：icon.png（方形）
+封面：cover.png（3:4 竖版）
+由内置 imagegen 生成；封面为宣传插画，真实界面见 preview-mobile.png。
