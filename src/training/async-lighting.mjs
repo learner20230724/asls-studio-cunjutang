@@ -1,7 +1,12 @@
 import * as THREE from 'three';
+import {calculate} from './lighting-compute.mjs';
+import {canWorker} from '../minitool/platform.mjs';
+class LocalJob {postMessage(d){this.timer=setTimeout(()=>this.onmessage?.({data:calculate(d)}),0)} terminate(){clearTimeout(this.timer)}}
+function worker(){if(canWorker())try{return new Worker('./lighting.js')}catch{}return new LocalJob()}
 // One in-flight job and one replaceable latest request: no animation job backlog.
 export class AsyncLighting {
- constructor(renderer){this.renderer=renderer;this.worker=new Worker(new URL('./lighting.worker.js',import.meta.url),{type:'module'});this.known=new Set();this.busy=false;this.lastKey='';this.epoch=0;this.worker.onmessage=({data})=>this.receive(data);this.worker.onerror=e=>{this.error=e.message;console.error('Lighting worker:',e.message);this.renderer.onError?.('灯光计算失败，请刷新页面');this.busy=false;};}
+ constructor(renderer){this.renderer=renderer;this.worker=worker();this.known=new Set();this.busy=false;this.lastKey='';this.epoch=0;this.worker.onmessage=({data})=>this.receive(data);this.worker.onerror=()=>this.restart(true);}
+ restart(local=false){this.worker.terminate();this.worker=local?new LocalJob():worker();this.worker.onmessage=({data})=>this.receive(data);this.worker.onerror=()=>this.restart(true);this.busy=false;this.reset();this.renderer.onInvalidate();}
  reset(){this.epoch++;this.known.clear();this.lastKey='';this.pending=null;}
  request(){const r=this.renderer;const meshes=[];r.lit.updateMatrixWorld(true);r.lit.traverse(m=>{if(m.isMesh){if(!m.geometry.attributes.irradiance)m.geometry.setAttribute('irradiance',new THREE.BufferAttribute(new Float32Array(m.geometry.attributes.position.count*3),3));meshes.push(m);}});
  const key=JSON.stringify([this.epoch,r.activeRevision,meshes.map(m=>[m.geometry.uuid,...m.matrixWorld.elements]),r.beams.visible,r.lightData]);if(key===this.lastKey)return;this.lastKey=key;

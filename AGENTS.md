@@ -1,3 +1,7 @@
+# 通用小工具分支
+
+本分支交付入口为 `src/minitool/`，按 `MINITOOL.md` 构建、打包与部署独立 `/lightstage/`。禁止用本分支的 deploy:web 覆盖原学校版。移除学校名称和故障设定是用户明确要求；以下历史约定中与此冲突的名称、入口、灯具数量和 Worker 约束由本条及在线小工具规范替代。保持原分支和旧存档不变。
+
 # 存菊堂灯光排练室维护约定
 
 - 正式入口 `https://guihualab.cn/rehearsal/`。按 `docs/deployment-zh.md` 使用 `npm run deploy:web` 原子发布，并同步规划 Lab 已有卡片；不要改来源、存储键或清空已有练习。

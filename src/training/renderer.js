@@ -32,13 +32,13 @@ export class StageRenderer {
     this.postScene=new THREE.Scene();this.postCamera=new THREE.Camera();
     this.postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.ShaderMaterial({depthTest:false,depthWrite:false,uniforms:{image:{value:this.target.texture},haze:{value:this.hazeTarget.texture},sceneDepth:{value:this.target.depthTexture},hazeSize:{value:new THREE.Vector2(1,1)},useHaze:{value:0}},vertexShader:postVertex,fragmentShader:postFragment})));
     this.controls=new OrbitControls(this.camera,this.renderer.domElement);this.controls.enableDamping=false;this.controls.addEventListener('change',this.onInvalidate);this.stopOrbitOnInput=()=>this.setOrbit(false);this.controls.addEventListener('start',this.stopOrbitOnInput);this.controls.minDistance=6;this.controls.maxDistance=85;this.controls.maxPolarAngle=Math.PI*.49;this.controls.target.set(0,6,2);
-    this.materials=[];this.fixtures=[];this.meshes=[];this.capacity=0;this.selected=new Set();this.ray=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.stats={fps:0,fixtures:0,capacity:0,drawCalls:0,geometries:0};this.frames=0;this.lastStats=performance.now();this.quality='auto';this.stats.renderedFrames=0;this.resize=new ResizeObserver(()=>this.resizeView());this.resize.observe(host);
+    this.materials=[];this.fixtures=[];this.meshes=[];this.capacity=0;this.selected=new Set();this.ray=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.stats={fps:0,fixtures:0,capacity:0,drawCalls:0,geometries:0};this.frames=0;this.lastStats=performance.now();this.quality='auto';this.stats.renderedFrames=0;this.resize=new (globalThis.ResizeObserver||class {observe(){window.addEventListener('resize',this.f)} disconnect(){window.removeEventListener('resize',this.f)} constructor(f){this.f=f}})(()=>this.resizeView());this.resize.observe(host);
     this.down=e=>{this.pointerDown={x:e.clientX,y:e.clientY};};this.up=e=>{if(!this.pointerDown||Math.hypot(e.clientX-this.pointerDown.x,e.clientY-this.pointerDown.y)>6)return;const r=this.renderer.domElement.getBoundingClientRect();this.pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);this.ray.setFromCamera(this.pointer,this.camera);const hit=this.ray.intersectObjects(this.meshes)[0];if(hit)this.onSelect(hit.object.userData.ids[hit.instanceId],e.shiftKey||e.ctrlKey);};this.installObjectDrag();this.renderer.domElement.addEventListener('pointerdown',this.down);this.renderer.domElement.addEventListener('pointerup',this.up);this.view('audience');this.resizeView();
   }
   get showData(){return this.preferences||{};}
   resizeView(notify=true){
     const w=this.host.clientWidth,h=this.host.clientHeight;if(!w||!h)return;
-    const ratio=Math.min(devicePixelRatio||1,this.quality==='high'?2:1.5);
+    const ratio=Math.min(devicePixelRatio||1,this.quality==='low'?1:1.5,Math.sqrt((this.quality==='low'?1000000:2000000)/(w*h)));
     this.renderer.setPixelRatio(ratio);this.renderer.setSize(w,h);
     this.target.setSize(Math.round(w*ratio),Math.round(h*ratio));
     const scale=Math.min(this.quality==='high'?.85:.65,(this.quality==='high'?1100:800)/Math.max(this.target.width,this.target.height));
@@ -63,7 +63,7 @@ export class StageRenderer {
   }
   litMaterial(color){const m=new THREE.ShaderMaterial({uniforms:{base:{value:new THREE.Color(color)},fabric:{value:0},lightGate:{value:1}},vertexShader:surfaceVertex,fragmentShader:surfaceFragment,side:THREE.DoubleSide});this.materials.push(m);return m;}
   box(parent,size,position,color,lit=false){
-    const segments=lit?size.map(v=>Math.min(140,Math.max(1,Math.ceil(v/.2)))):[1,1,1];
+    const segments=lit?size.map(v=>Math.min(140,Math.max(1,Math.ceil(v/.45)))):[1,1,1];
     const m=new THREE.Mesh(new THREE.BoxGeometry(...size,...segments),lit?this.litMaterial(color):new THREE.MeshBasicMaterial({color}));m.position.set(...position);m.userData.owner=this.currentOwner||0;parent.add(m);return m;
   }
   label(text,x,y,z,color='#8c968e',scale=2.5){const c=document.createElement('canvas');c.width=512;c.height=64;const ctx=c.getContext('2d');ctx.fillStyle=color;ctx.font='24px sans-serif';ctx.textAlign='center';ctx.fillText(text,256,42);const tex=new THREE.CanvasTexture(c);const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));sprite.scale.set(scale,scale/8,1);sprite.position.set(x,y,z);this.decor.add(sprite);}
@@ -140,7 +140,7 @@ export class StageRenderer {
   buildCurtains(curtains){
     disposeTree(this.curtainRoot);this.curtainMeshes=[];
     for(const [i,c]of curtains.entries())for(const side of [-1,1]){
-      const g=new THREE.PlaneGeometry(1,this.stage.height,96,24),a=g.attributes.position;
+      const g=new THREE.PlaneGeometry(1,this.stage.height,64,12),a=g.attributes.position;
       for(let v=0;v<a.count;v++){const x=a.getX(v)+.5,z=a.getY(v)+this.stage.height/2;a.setXYZ(v,x,Math.sin(x*Math.PI*32)*.115,z);}
       g.computeVertexNormals();g.setAttribute('owner',new THREE.BufferAttribute(new Float32Array(a.count).fill(1001+i),1));
       const mat=this.litMaterial(['#9a394e','#63516c','#405a68','#424d62'][i%4]);mat.uniforms.fabric.value=1;

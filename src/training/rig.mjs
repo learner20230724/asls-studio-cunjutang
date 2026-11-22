@@ -14,7 +14,7 @@ export function profile(kind='spot', angle=36) {
     availableChannels.Pan={capability:{type:'Pan',angleStart:'-180deg',angleEnd:'180deg'}};
     availableChannels.Tilt={capability:{type:'Tilt',angleStart:'-90deg',angleEnd:'90deg'}};
   }
-  return {name:`Teaching ${kind}`,categories:[kind==='moving'?'Moving Head':kind==='rgb'?'Color Changer':'Other'],physical:{bulb:{colorTemperature:kind==='conference'?4500:3200},lens:{degreesMinMax:[angle,angle]}},modes:[{name:'Teaching',channels:Object.keys(availableChannels)}],availableChannels};
+  return {name:`Standard ${kind}`,categories:[kind==='moving'?'Moving Head':kind==='rgb'?'Color Changer':'Other'],physical:{bulb:{colorTemperature:kind==='conference'?4500:3200},lens:{degreesMinMax:[angle,angle]}},modes:[{name:'Standard',channels:Object.keys(availableChannels)}],availableChannels};
 }
 export function buildRig(stage=DEFAULT_STAGE) {
   stage={...clone(DEFAULT_STAGE),...clone(stage)};
@@ -23,12 +23,12 @@ export function buildRig(stage=DEFAULT_STAGE) {
   function add(zone,number,kind,x,y,z,target,more={}) {
     const id=out.length, prefix=kind==='conference'?'H':kind==='moving'?'M':'L';
     const meta={uid:`${zone}-${prefix}${String(number).padStart(2,'0')}`,zone,number,kind,broken:false,angle:kind==='conference'?55:kind==='moving'?24:36,target,baseColor:kind==='conference'?'#fff0db':kind==='rgb'||kind==='moving'?'#ffffff':'#ffd5a3',estimated:true,...more};
-    out.push({id,name:`${LABELS[zone]} ${prefix}${String(number).padStart(2,'0')}`,manufacturer:'cunjutang',model:kind,category:kind==='moving'?'Moving Head':'Other',mode:'Teaching',universe:0,chStart:0,position:{x,y,z},rotation:{x:0,y:0,z:0},training:meta,OFLData:profile(kind,meta.angle)});
+    out.push({id,name:`${LABELS[zone]} ${prefix}${String(number).padStart(2,'0')}`,manufacturer:'stage',model:kind,category:kind==='moving'?'Moving Head':'Other',mode:'Standard',universe:0,chStart:0,position:{x,y,z},rotation:{x:0,y:0,z:0},training:meta,OFLData:profile(kind,meta.angle)});
   }
-  for(let i=0;i<27;i++)add('front',i+1,'spot',spread(i,27),-4,h,{x:spread(i,27)*.8,y:4,z:1},{broken:i===3});
+  for(let i=0;i<27;i++)add('front',i+1,'spot',spread(i,27),-4,h,{x:spread(i,27)*.8,y:4,z:1},{broken:false});
   for(const side of ['left','right']){
     const sign=side==='left'?1:-1;
-    for(let r=0;r<4;r++)for(let c=0;c<3;c++)add(`ear-${side}`,r*3+c+1,'spot',sign*(w/2+1+c*.38),-1,h-1-r*1.25,{x:-sign*w*.17,y:2+c*2,z:1},{row:r+1,column:c+1,broken:side==='right'&&r===0&&c===1});
+    for(let r=0;r<4;r++)for(let c=0;c<3;c++)add(`ear-${side}`,r*3+c+1,'spot',sign*(w/2+1+c*.38),-1,h-1-r*1.25,{x:-sign*w*.17,y:2+c*2,z:1},{row:r+1,column:c+1,broken:false});
     const ys=(side==='left'?[.84,.68,.22]:[.84,.51,.18]).map(v=>v*d);
     for(let g=0;g<3;g++)for(let r=0;r<2;r++)for(let c=0;c<2;c++)add(`side-${side}`,g*4+r*2+c+1,'spot',sign*(w/2+.7),ys[g]+c*.45,3.6-r*.65,{x:-sign*w*.18,y:ys[g],z:1},{block:g+1,row:r+1,column:c+1});
   }
@@ -37,7 +37,7 @@ export function buildRig(stage=DEFAULT_STAGE) {
     if(row%2){
       for(let i=0;i<15;i++)for(const kind of ['conference','spot']){
         const x=spread(i*2+(kind==='spot'?1:0),30);
-        add(`top-${row}`,i+1,kind,x,y,h,{x:x*.95,y:y+.7,z:0},{row,broken:row===1&&((kind==='spot'&&i===1)||(kind==='conference'&&i===11))});
+        add(`top-${row}`,i+1,kind,x,y,h,{x:x*.95,y:y+.7,z:0},{row,broken:false});
       }
     }else{
       for(let i=0;i<11;i++)add(`top-${row}`,i+1,'conference',spread(i,11),y,h,{x:spread(i,11),y:y+.5,z:0},{row});
@@ -61,7 +61,7 @@ export function createTemplate(){
   const levels=[f=>f.training.zone==='front'?170:f.training.zone==='top-1'?45:0,f=>f.training.zone==='front'?95:f.training.zone.startsWith('ear')?150:0,f=>f.training.zone.startsWith('side')?210:f.training.zone==='front'?40:0,()=>0];
   ['人物面光','双人对话','侧光塑形','换场暗场'].forEach((name,id)=>all.cues.push({id,name,type:0,duration:1,relative:1,fixtureValues:fixtures.map(f=>({fixture:{id:f.id},channelValues:Object.keys(f.OFLData.availableChannels).map((key,i)=>({id:i+1,type:['Red','Green','Blue'].includes(key)?'Color':key,qaIndex:['Red','Green','Blue'].includes(key)?['Red','Green','Blue'].indexOf(key):0,color:['Red','Green','Blue'].includes(key)?key:null,value:key==='Dimmer'?levels[id](f):['Pan','Tilt'].includes(key)?128:255,active:true}))}))}));
   groups.push(all);
-  return {name:'存菊堂 · 话剧灯光预演',bpm:120,fixtures,universes:universesFor(fixtures),groups,outputs:[],visualizer:{globalBrightness:15,globalFoggingState:0},training:{version:1,layoutVersion:2,propsVersion:1,curtains:defaultCurtains(DEFAULT_STAGE),source:'存菊堂口述灯位 / 2026-11-02',stage:clone(DEFAULT_STAGE),objects:[{id:'actor-1',kind:'actor',name:'演员 A',x:2,y:4,rotation:0},{id:'actor-2',kind:'actor',name:'演员 B',x:-2,y:4,rotation:0},...defaultProps(DEFAULT_STAGE)],settings:{quality:'auto',fog:false,repair:false,blackout:false,master:1,autoOn:false,autoLevel:70},cueTimes:{'20:0':2,'20:1':2,'20:2':3,'20:3':2},cueStages:{},currentChannels:{},note:'左耳光镜像、尺寸、灯高、朝向、灯具型号及能力为教学估算，可修改；不代表实测。'}};
+  return {name:'光场 · 话剧灯光预演',bpm:120,fixtures,universes:universesFor(fixtures),groups,outputs:[],visualizer:{globalBrightness:15,globalFoggingState:0},training:{version:1,layoutVersion:2,propsVersion:1,curtains:defaultCurtains(DEFAULT_STAGE),source:'通用剧场',stage:clone(DEFAULT_STAGE),objects:[{id:'actor-1',kind:'actor',name:'演员 A',x:2,y:4,rotation:0},{id:'actor-2',kind:'actor',name:'演员 B',x:-2,y:4,rotation:0},...defaultProps(DEFAULT_STAGE)],settings:{quality:'auto',fog:false,repair:false,blackout:false,master:1,autoOn:false,autoLevel:70},cueTimes:{'20:0':2,'20:1':2,'20:2':3,'20:3':2},cueStages:{},currentChannels:{},note:''}};
 }
 export function effectiveIntensity(value,broken,settings={},soloPass=true){return settings.blackout||!soloPass||(broken&&!settings.repair)?0:Math.min(1,Math.max(0,Number(value)||0))*Math.min(1,Math.max(0,settings.master??1));}
 export function nextCapacity(count){let capacity=32;while(capacity<count)capacity*=2;return capacity;}

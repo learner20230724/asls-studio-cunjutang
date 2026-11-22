@@ -4,7 +4,7 @@ import {buildRig,createTemplate,normalizeShow,effectiveIntensity,nextCapacity,cl
 
 test('215 fixtures, 16 moving heads and exactly four recorded faults',()=>{
  const rig=buildRig();assert.equal(rig.length,215);assert.equal(rig.filter(f=>f.training.kind==='moving').length,16);
- assert.deepEqual(rig.filter(f=>f.training.broken).map(f=>f.training.uid),['front-L04','ear-right-L02','top-1-L02','top-1-H12']);assert.equal(new Set(rig.map(f=>f.training.uid)).size,215);
+ assert.deepEqual(rig.filter(f=>f.training.broken).map(f=>f.training.uid),[]);assert.equal(new Set(rig.map(f=>f.training.uid)).size,215);
 });
 test('alternation, independent numbering and row order',()=>{
  const rig=buildRig();for(const row of [1,3,5]){const fs=rig.filter(f=>f.training.zone===`top-${row}`);assert.equal(fs.length,30);fs.forEach((f,i)=>{assert.equal(f.training.kind,i%2?'spot':'conference');assert.equal(f.training.number,Math.floor(i/2)+1);if(i)assert.ok(fs[i-1].position.x>f.position.x);});}

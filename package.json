@@ -1,6 +1,6 @@
 {
   "name": "asls-studio-cunjutang",
-  "author": "Tim\u00e9 Kadel",
+  "author": "Timé Kadel",
   "version": "0.4.3",
   "private": true,
   "main": "./out/main/main.js",
@@ -25,7 +25,11 @@
     "preview": "vite preview --host 127.0.0.1",
     "serve": "node scripts/serve.mjs",
     "templates": "node scripts/generate-templates.mjs",
-    "deploy:web": "python3 scripts/deploy-local.py"
+    "deploy:web": "python3 scripts/deploy-local.py",
+    "build:minitool": "node scripts/build-minitool.mjs",
+    "build:miniweb": "MINI_WEB=1 node scripts/build-minitool.mjs",
+    "check:minitool": "node scripts/check-minitool.cjs",
+    "deploy:miniweb": "python3 scripts/deploy-miniweb.py"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",

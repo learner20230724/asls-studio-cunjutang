@@ -11,7 +11,7 @@ export function curtainBoxes(stage,curtains=[]){
 }
 export function migrateVenue(raw){
   const d=JSON.parse(JSON.stringify(raw));
-  if(d.training?.stage?.width===16&&!d.training.layoutVersion&&d.training.source?.includes('存菊堂')){
+  if(d.training?.stage?.width===16&&!d.training.layoutVersion&&d.training.source?.includes('通用剧场')){
     const scale=21/16;
     for(const f of d.fixtures){if(Number.isFinite(f.position?.x))f.position.x*=scale;if(Number.isFinite(f.training?.target?.x))f.training.target.x*=scale;}
     for(const o of d.training.objects||[])if(Number.isFinite(o.x))o.x*=scale;
