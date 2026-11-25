@@ -1,7 +1,9 @@
 from pathlib import Path
-import zipfile,subprocess,re,json,hashlib
+import zipfile,subprocess,re,json,hashlib,sys
 root=Path(__file__).resolve().parents[1]
-dist=root/'dist-minitool'; out=root/'delivery';out.mkdir(exist_ok=True)
+legacy_follow='--legacy-follow' in sys.argv[1:]
+dist=root/('dist-minitool-legacy-follow' if legacy_follow else 'dist-minitool')
+out=root/'delivery';out.mkdir(exist_ok=True)
 assert (dist/'index.html').exists()
 allowed={'.html','.js','.css','.json','.png','.jpg','.jpeg','.gif','.svg','.webp','.woff','.woff2'}
 for p in dist.rglob('*'):
@@ -14,12 +16,17 @@ for p in dist.rglob('*'):
 html=(dist/'index.html').read_text()
 for ref in re.findall(r'(?:src|href)="([^"]+)"',html):assert ref.startswith('./') and (dist/ref).is_file(),ref
 assert not re.search(r'<script[^>]*>\s*[^<\s]',html)
-archive=out/'lightstage-minitool-1.0.10.zip'
+version='1.0.11'
+if legacy_follow:
+ version+='-legacy-follow'
+else:
+ assert '.followAuthor(' not in (dist/'app.js').read_text(), 'Retired API present in the standard package'
+archive=out/f'lightstage-minitool-{version}.zip'
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,9) as z:
  for p in sorted(dist.rglob('*')):
   if p.is_file():z.write(p,p.relative_to(dist))
 audit=root/'.codex/minitool-zip-builder/scripts/audit_artifact.py'
 for p in [dist,archive]:subprocess.run(['python3',str(audit),str(p)],check=True)
-report={'version':'1.0.10','zip':str(archive),'bytes':archive.stat().st_size,'sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),'files':[str(p.relative_to(dist)) for p in dist.rglob('*') if p.is_file()],'unit_tests':41,'native_platform_validation':'pending','android_device_validation':'pending','ios_device_validation':'pending','browser_evidence':json.loads((root/'output/minitool-browser-check.json').read_text())}
-(out/'validation-summary.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+report={'version':version,'zip':str(archive),'bytes':archive.stat().st_size,'sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),'files':[str(p.relative_to(dist)) for p in dist.rglob('*') if p.is_file()],'unit_tests':44,'native_platform_validation':'pending','android_device_validation':'pending','ios_device_validation':'pending','browser_evidence':json.loads((root/'output/minitool-browser-check.json').read_text()),'legacy_follow_smoke':legacy_follow and json.loads((root/'output/minitool-follow-check.json').read_text())}
+(out/('validation-summary-legacy-follow.json' if legacy_follow else 'validation-summary.json')).write_text(json.dumps(report,ensure_ascii=False,indent=2))
 print(json.dumps(report,ensure_ascii=False,indent=2))

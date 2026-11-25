@@ -38,6 +38,7 @@ output/
 *.log
 
 /dist-minitool/
+/dist-minitool-legacy-follow/
 /dist-miniweb/
 /delivery/
 /published/
